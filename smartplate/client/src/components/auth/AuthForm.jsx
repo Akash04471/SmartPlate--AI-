@@ -1,39 +1,64 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiRequest } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
-export default function AuthForm({
-  type = "login",
-  onSubmit,
-}) {
+export default function AuthForm({ type }) {
+  const { login } = useAuth();
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      if (type === "signup") {
+        await apiRequest("/auth/signup", {
+          method: "POST",
+          body: JSON.stringify(form),
+        });
+      }
+
+      const res = await apiRequest("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
+      });
+
+      login(res.token);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   return (
-    <form
-      onSubmit={onSubmit}
-      className="space-y-4"
-    >
+    <form onSubmit={handleSubmit} className="space-y-4">
       {type === "signup" && (
         <Input
-          type="text"
-          placeholder="Full Name"
-          required
+          placeholder="Name"
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
       )}
 
       <Input
+        placeholder="Email"
         type="email"
-        placeholder="Email address"
-        required
+        onChange={(e) => setForm({ ...form, email: e.target.value })}
       />
 
       <Input
-        type="password"
         placeholder="Password"
-        required
+        type="password"
+        onChange={(e) => setForm({ ...form, password: e.target.value })}
       />
 
-      <Button
-        type="submit"
-        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-      >
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+
+      <Button className="w-full">
         {type === "login" ? "Sign In" : "Create Account"}
       </Button>
     </form>

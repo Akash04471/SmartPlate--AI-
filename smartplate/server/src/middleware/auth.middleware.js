@@ -1,3 +1,4 @@
+
 import jwt from "jsonwebtoken";
 
 export function authenticate(req, res, next) {
@@ -9,9 +10,13 @@ export function authenticate(req, res, next) {
 
   const token = authHeader.split(" ")[1];
 
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    req.user = { id: decoded.sub }; // only attach what controllers need
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });

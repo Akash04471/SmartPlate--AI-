@@ -1,0 +1,270 @@
+@import "tailwindcss";
+
+/* ─── SAP DEEP GREEN DESIGN TOKENS ───────────────────── */
+@theme {
+  --color-base-dark: #031810;
+  --color-base-dark2: #052015;
+  --color-accent: #11ff99;
+  --color-emerald: #10b981;
+  
+  --color-text-primary: #e6fced;
+  --color-text-secondary: #88a89b;
+  --color-text-muted: #4a665a;
+  --color-border: rgba(16, 185, 129, 0.12);
+
+  --font-display: 'Outfit', sans-serif;
+
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-label: 'Space Grotesk', sans-serif;
+
+  --aura-emerald: 160 100% 50%;
+  --aura-ruby: 10 100% 50%;
+  --aura-amber: 45 100% 50%;
+  --liquid-ease: cubic-bezier(0.85, 0, 0.15, 1);
+}
+
+/* ─── BASE RESET ─────────────────────────────────────────────────── */
+* {
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+html, body {
+  cursor: none;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--color-base-dark);
+}
+
+body {
+  background: var(--color-base-dark);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01', 'ss02', 'cv01', 'cv11';
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-base-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ─── TYPOGRAPHY SYSTEM ──────────────────────────────────────────── */
+.heading-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-text-primary);
+}
+
+.body-refined {
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.65;
+}
+
+.mono-detail {
+  font-family: var(--font-label);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* ─── MINIMALIST UI COMPONENTS ───────────────────────────────────── */
+.obsidian-card {
+  background: rgba(3, 24, 16, 0.6);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(16, 185, 129, 0.12);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.5);
+
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.obsidian-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.7s;
+  pointer-events: none;
+  background: radial-gradient(400px circle at var(--mouse-x) var(--mouse-y), rgba(255,255,255,0.06), transparent 40%);
+}
+
+/* Ensure interactive content inside cards stays above the ::before overlay */
+.obsidian-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.obsidian-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.obsidian-card:hover::before {
+  opacity: 1;
+}
+
+.obsidian-btn {
+  background: #10b981;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: all 0.3s ease;
+  font-family: var(--font-body);
+  border: 1px solid #10b981;
+}
+
+
+.obsidian-btn:hover {
+  background: #f0f0f0;
+  transform: scale(0.98);
+}
+
+.obsidian-btn-outline {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.75rem 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.obsidian-btn-outline:hover {
+  border-color: white;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ─── HUD ELEMENTS ──────────────────────────────────────────────── */
+.tech-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.tech-hud {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.4em;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+}
+
+.coordinate-display {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ─── AURA GRADIENTS ─────────────────────────────────────────────── */
+.aura-gradient {
+  background: radial-gradient(circle at center, hsla(var(--aura-emerald), 0.05) 0%, transparent 70%);
+}
+
+/* ─── MAGNETIC INTERFACE ─────────────────────────────────────────── */
+.magnetic-wrap {
+  position: relative;
+  display: inline-block;
+  transition: transform 0.5s;
+}
+
+/* ─── SCROLLYTELLING ─────────────────────────────────────────────── */
+.scroll-sequence {
+  position: relative;
+  height: 600vh;
+}
+
+.scroll-sequence-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.pinned-section {
+  position: relative;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.horizontal-scroll-container {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6rem;
+  padding-left: 10vw;
+  padding-right: 10vw;
+  align-items: center;
+  height: 100vh;
+  width: max-content;
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+
+/* ─── LIQUID TEXT REVEAL ─────────────────────────────────────────── */
+.text-liquid {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.text-liquid > span {
+  display: inline-block;
+  transform: translateY(110%);
+  filter: blur(10px);
+  opacity: 0;
+  animation: liquid-reveal 1.2s var(--liquid-ease) forwards;
+}
+
+@keyframes liquid-reveal {
+  to {
+    transform: translateY(0);
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+/* ─── GRAINY TEXTURE ─────────────────────────────────────────────── */
+.bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}

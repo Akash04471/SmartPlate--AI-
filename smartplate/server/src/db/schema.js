@@ -73,13 +73,14 @@ export const dietPreferenceEnum = pgEnum('diet_preference', [
 ]);
 
 export const userProfiles = pgTable('user_profiles', {
-  id:             uuid('id').primaryKey().defaultRandom(),
-  userId:         uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
-  heightCm:       real('height_cm'),
-  weightKg:       real('weight_kg'),
-  age:            integer('age'),
-  activityLevel:    activityLevelEnum('activity_level'),
-  goalType:         goalTypeEnum('goal_type'),
+  userId:      uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  age:         integer('age'),
+  gender:      genderEnum('gender'),
+  heightCm:    integer('height_cm'),
+  weightKg:    doublePrecision('weight_kg'),
+  activityLevel: activityLevelEnum('activity_level').default('sedentary'),
+  birthDate:   timestamp('birth_date'),
+  goalType:    goalTypeEnum('goal_type').default('general_health'),
   dietPreference:   dietPreferenceEnum('diet_preference'),
   baselineWeightKg:   real('baseline_weight_kg'),
   baselineBodyFatPct: real('baseline_body_fat_pct'),

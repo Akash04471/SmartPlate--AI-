@@ -726,12 +726,16 @@ function SettingsTab({ profile, onUpdate }: any) {
   const [formData, setFormData] = useState({
     name: getUser()?.name || "",
     age: profile?.age || "",
+    gender: profile?.gender || "male",
+    heightCm: profile?.heightCm || "",
     weightKg: profile?.weightKg || "",
     goalType: profile?.goalType || "general_health",
     dietPreference: profile?.dietPreference || "omnivore",
+    activityLevel: profile?.activityLevel || "sedentary",
     coachEnabled: profile?.coachEnabled || false
   });
 
+  const [userName, setUserName] = useState(getUser()?.name || "");
   const [saving, setSaving] = useState(false);
 
   const goals = [
@@ -740,6 +744,20 @@ function SettingsTab({ profile, onUpdate }: any) {
     { id: "maintain_weight", label: "Maintain" },
     { id: "improve_endurance", label: "Endurance" },
     { id: "general_health", label: "Health" }
+  ];
+
+  const activityLevels = [
+    { value: 'sedentary', label: 'Sedentary (Office job)' },
+    { value: 'lightly_active', label: 'Lightly Active (Exercise 1-3 days/week)' },
+    { value: 'moderately_active', label: 'Moderately Active (Exercise 3-5 days/week)' },
+    { value: 'very_active', label: 'Very Active (Hard exercise 6-7 days/week)' },
+    { value: 'extra_active', label: 'Extra Active (Physical job + hard training)' }
+  ];
+
+  const genders = [
+    { value: 'male', label: 'Male' },
+    { value: 'female', label: 'Female' },
+    { value: 'other', label: 'Other' }
   ];
 
   const diets = [
@@ -753,7 +771,7 @@ function SettingsTab({ profile, onUpdate }: any) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await upsertProfile(formData);
+      await upsertProfile({ ...formData, name: userName });
       onUpdate();
     } catch (err) {
       console.error(err);

@@ -56,19 +56,69 @@ export const getProfileByUserId = async (userId) => {
 // If it doesn't exist → INSERT it.
 // Either way, the caller gets back the current saved state.
 // ---------------------------------------------------------------------------
+
+/**
+ * METABOLIC ENGINE (Mifflin-St Jeor Equation)
+ * Calculates precision targets based on body metrics.
+ */
+function calculateMetabolicTargets(data) {
+  const { gender, weightKg, heightCm, age, activityLevel, goalType } = data;
+  if (!weightKg || !heightCm || !age || !gender) return null;
+
+  // 1. Calculate BMR
+  let bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * age);
+  bmr = (gender === 'male') ? bmr + 5 : bmr - 161;
+
+  // 2. Apply Activity Multiplier (TDEE)
+  const multipliers = {
+    sedentary: 1.2,
+    lightly_active: 1.375,
+    moderately_active: 1.55,
+    very_active: 1.725,
+    extra_active: 1.9
+  };
+  const tdee = bmr * (multipliers[activityLevel] || 1.2);
+
+  // 3. Adjust for Goal
+  let calories = tdee;
+  if (goalType === 'weight_loss') calories -= 500;
+  if (goalType === 'extreme_loss') calories -= 750;
+  if (goalType === 'muscle_gain' || goalType === 'bulking') calories += 300;
+
+  // 4. Calculate Macros
+  // Protein: 1.8g per kg for muscle gain/loss, 1.2g for maintenance
+  const proteinMultiplier = (goalType === 'muscle_gain' || goalType === 'weight_loss') ? 1.8 : 1.4;
+  const proteinG = Math.round(weightKg * proteinMultiplier);
+  
+  // Fat: 25% of calories
+  const fatG = Math.round((calories * 0.25) / 9);
+  
+  // Carbs: Remainder
+  const carbsG = Math.round((calories - (proteinG * 4) - (fatG * 9)) / 4);
+
+  return {
+    dailyCalorieTarget: Math.round(calories),
+    dailyProteinTargetG: proteinG,
+    dailyCarbsTargetG: carbsG,
+    dailyFatTargetG: fatG
+  };
+}
+
 export const upsertProfile = async (req, res, next) => {
   try {
     const {
-      heightCm, weightKg, age,
+      heightCm, weightKg, age, gender,
       activityLevel, goalType, dietPreference,
       baselineWeightKg, baselineBodyFatPct,
       dailyCalorieTarget, dailyProteinTargetG,
       dailyCarbsTargetG, dailyFatTargetG,
+      autoCalculate = true // Default to auto-calc if metrics change
     } = req.body;
 
-    const profileData = {
+    let profileData = {
       userId: req.user.id,
       updatedAt: new Date(),
+      ...(gender               != null && { gender }),
       ...(heightCm             != null && { heightCm:             Number(heightCm) }),
       ...(weightKg             != null && { weightKg:             Number(weightKg) }),
       ...(age                  != null && { age:                  Number(age) }),
@@ -84,13 +134,31 @@ export const upsertProfile = async (req, res, next) => {
       ...(req.body.coachEnabled != null && { coachEnabled:         Boolean(req.body.coachEnabled) }),
     };
 
+    // Auto-calculate targets if metrics are provided and autoCalculate is on
+    if (autoCalculate && (heightCm || weightKg || age || activityLevel || goalType)) {
+      // Fetch existing if some are missing in the request
+      const existing = await getProfileByUserId(req.user.id);
+      const calcData = {
+        gender: gender || existing?.gender,
+        weightKg: weightKg || existing?.weightKg,
+        heightCm: heightCm || existing?.heightCm,
+        age: age || existing?.age,
+        activityLevel: activityLevel || existing?.activityLevel,
+        goalType: goalType || existing?.goalType
+      };
+
+      const targets = calculateMetabolicTargets(calcData);
+      if (targets) {
+        profileData = { ...profileData, ...targets };
+      }
+    }
 
     const [profile] = await db
       .insert(userProfiles)
       .values(profileData)
       .onConflictDoUpdate({
-        target: userProfiles.userId,  // the unique constraint to check
-        set:    profileData,          // what to update if conflict found
+        target: userProfiles.userId, 
+        set:    profileData,         
       })
       .returning();
 
@@ -98,4 +166,4 @@ export const upsertProfile = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-};
+};

@@ -14,7 +14,15 @@ export const metadata: Metadata = {
       "Transform your health with personalized diet plans, precision calorie tracking, and smart nutrition insights.",
     type: "website",
   },
+  themeColor: "#031810",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "SmartPlate",
+  },
 };
+
 
 import CustomCursor from "@/components/CustomCursor";
 

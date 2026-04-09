@@ -1,0 +1,39 @@
+name: SmartPlate CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - name: Install dependencies
+        run: cd smartplate/server && npm install
+      - name: Run tests
+        run: cd smartplate/server && npm run test:ci
+        env:
+          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres" # Example mock for CI
+          JWT_SECRET: "testsecret123testsecret123testsecret123"
+          EDAMAM_APP_ID: "test"
+          EDAMAM_APP_KEY: "test"
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - name: Install dependencies
+        run: cd smartplate/landing && npm install
+      - name: Build project
+        run: cd smartplate/landing && npm run build

@@ -1,8 +1,9 @@
 // src/db/schema.js — full file, replace entirely
 import {
   pgTable, uuid, text, timestamp,
-  real, integer, pgEnum
+  real, integer, pgEnum, boolean
 } from 'drizzle-orm/pg-core';
+
 
 // ── Existing ────────────────────────────────────────────────────────────────
 
@@ -90,9 +91,13 @@ export const userProfiles = pgTable('user_profiles', {
   totalPoints:      integer('total_points').default(0).notNull(),
   weeklyAwardCount: integer('weekly_award_count').default(0).notNull(),
   
+  // AI Coaching Preference (Opt-in)
+  coachEnabled:     boolean('coach_enabled').default(false).notNull(),
+  
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
 
 // Weight tracking (Day-to-day changes)
 export const weightLogs = pgTable('weight_logs', {

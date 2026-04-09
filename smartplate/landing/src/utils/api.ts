@@ -199,3 +199,19 @@ export async function getAdherenceStats() {
   }>("/progress/adherence");
 }
 
+// ─── AI Coach ────────────────────────────────────────────────────────────────
+
+export async function getCoachInsights() {
+  return apiFetch<{ 
+    enabled: boolean; 
+    data?: {
+      intake: { calories: number; protein: number; carbs: number; fat: number };
+      targets: { calories: number; protein: number; carbs: number; fat: number };
+      advice: string;
+      suggestion: { type: string; amount: number; unit: string } | null;
+    };
+    message?: string;
+  }>("/coach/insights");
+}
+
+

@@ -81,7 +81,9 @@ export const upsertProfile = async (req, res, next) => {
       ...(dailyProteinTargetG  != null && { dailyProteinTargetG:  Number(dailyProteinTargetG) }),
       ...(dailyCarbsTargetG    != null && { dailyCarbsTargetG:    Number(dailyCarbsTargetG) }),
       ...(dailyFatTargetG      != null && { dailyFatTargetG:      Number(dailyFatTargetG) }),
+      ...(req.body.coachEnabled != null && { coachEnabled:         Boolean(req.body.coachEnabled) }),
     };
+
 
     const [profile] = await db
       .insert(userProfiles)

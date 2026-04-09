@@ -84,6 +84,8 @@ export default function DashboardPage() {
   const [adherenceStats, setAdherenceStats] = useState<any>(null);
   const [isCheatDayUnlocked, setIsCheatDayUnlocked] = useState(false);
   const [historyMeals, setHistoryMeals] = useState<MealLog[]>([]);
+  const [coachInsights, setCoachInsights] = useState<any>(null);
+
 
 
 
@@ -149,6 +151,15 @@ export default function DashboardPage() {
         setAdherenceStats(adherenceRes.value);
         setIsCheatDayUnlocked(adherenceRes.value.awards.some((a: any) => a.type === 'cheat_day_unlock'));
       }
+
+      // Fetch AI Coach Insights
+      try {
+        const coachRes = await getCoachInsights();
+        setCoachInsights(coachRes);
+      } catch (err) {
+        console.error("Coach insights load error:", err);
+      }
+
 
       
     } catch (err) {
@@ -242,7 +253,8 @@ export default function DashboardPage() {
       {/* ─── MAIN CONTENT ───────────────────────────────────── */}
       <main className="flex-1 p-10 overflow-y-auto">
         <AnimatePresence mode="wait">
-          {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} historyMeals={historyMeals} suggestions={suggestions} goalLabel={goalLabel} onAddMeal={() => setShowAddMeal(true)} />}
+          {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} historyMeals={historyMeals} suggestions={suggestions} coachInsights={coachInsights} goalLabel={goalLabel} onAddMeal={() => setShowAddMeal(true)} onToggleCoach={() => loadData()} />}
+
 
           {activeTab === "diet" && <DietPlanTab key="diet" profile={profile} goalLabel={goalLabel} />}
           {activeTab === "progress" && <ProgressTab key="progress" weightHistory={weightHistory} adherenceStats={adherenceStats} onLogWeight={(w: number) => { logWeight(w); loadData(); }} />}
@@ -315,6 +327,41 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
           </button>
         </div>
       </header>
+
+      {/* AI COACH INSIGHT CARD */}
+      <div className="p-1 border border-white/5 bg-white/[0.01] rounded-[2.5rem] relative overflow-hidden group/coach">
+        <div className="p-8 flex flex-col md:flex-row gap-8 items-center justify-between relative z-10">
+          <div className="flex gap-6 items-center">
+            <div className={`p-5 rounded-3xl ${coachInsights?.enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-white/20'}`}>
+               <Sparkles size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black italic tracking-tighter text-white mb-2" style={{ fontFamily: 'var(--font-display)' }}>AI Health Coach</h3>
+              <p className="max-w-xl text-sm font-medium text-white/60 leading-relaxed italic">
+                {coachInsights?.enabled 
+                  ? coachInsights.data?.advice 
+                  : "Enable the AI Coach in the settings to get personalized daily nutritional advice and meal suggestions."}
+              </p>
+            </div>
+          </div>
+          {!coachInsights?.enabled && (
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className="px-8 py-4 bg-white/[0.03] border border-white/10 hover:border-white/20 text-white/60 hover:text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all"
+            >Configure Coach</button>
+          )}
+          {coachInsights?.enabled && coachInsights.data?.suggestion && (
+            <div className="px-6 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center">
+               <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400/60 mb-1">Focus Target</p>
+               <p className="text-lg font-black italic tracking-tighter text-emerald-400">+{coachInsights.data.suggestion.amount}{coachInsights.data.suggestion.unit} {coachInsights.data.suggestion.type}</p>
+            </div>
+          )}
+        </div>
+        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover/coach:opacity-20 transition-opacity">
+           <Zap size={120} strokeWidth={1} />
+        </div>
+      </div>
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -663,8 +710,10 @@ function SettingsTab({ profile, onUpdate }: any) {
     age: profile?.age || "",
     weightKg: profile?.weightKg || "",
     goalType: profile?.goalType || "general_health",
-    dietPreference: profile?.dietPreference || "omnivore"
+    dietPreference: profile?.dietPreference || "omnivore",
+    coachEnabled: profile?.coachEnabled || false
   });
+
   const [saving, setSaving] = useState(false);
 
   const goals = [
@@ -737,7 +786,24 @@ function SettingsTab({ profile, onUpdate }: any) {
              ))}
           </div>
         </div>
+
+        <div className="md:col-span-2 p-8 border border-white/5 bg-white/[0.01] rounded-[2rem] flex items-center justify-between">
+           <div>
+             <h4 className="text-sm font-black italic tracking-tighter text-white mb-1">Empower AI Coaching</h4>
+             <p className="text-xs text-white/20 font-medium italic">Allow our Intelligence Engine to provide casual, supportive advice based on your daily gaps.</p>
+           </div>
+           <button 
+             onClick={() => setFormData({...formData, coachEnabled: !formData.coachEnabled})}
+             className={`w-16 h-8 rounded-full relative transition-all ${formData.coachEnabled ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-white/10'}`}
+           >
+             <motion.div 
+               animate={{ x: formData.coachEnabled ? 32 : 4 }}
+               className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg" 
+             />
+           </button>
+        </div>
       </div>
+
 
       <div className="pt-10 flex justify-end">
         <button 

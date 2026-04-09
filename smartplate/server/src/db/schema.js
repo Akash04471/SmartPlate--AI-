@@ -26,6 +26,7 @@ export const mealLogs = pgTable('meal_logs', {
   mealType:  mealTypeEnum('meal_type').notNull(),
   loggedAt:  timestamp('logged_at').defaultNow().notNull(),
   notes:     text('notes'),
+  imageUrl:  text('image_url'), // Pillar 4: Cloudinary URL
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

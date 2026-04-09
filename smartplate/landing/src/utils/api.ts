@@ -232,5 +232,29 @@ export async function seedTribes() {
   return apiFetch("/tribes/seed", { method: "POST" });
 }
 
+// ─── AI Vision ──────────────────────────────────────────────────────────────
+
+export async function analyzeImage(file: File) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/nutrition/analyze-image`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.error || "Vision analysis failed");
+  }
+
+  return res.json();
+}
+
+
 
 

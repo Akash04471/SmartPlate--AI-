@@ -1,9 +1,84 @@
-// src/controllers/nutrition.controller.js
-import { getProfileByUserId } from '../controllers/profile.controller.js'; // To get user preferences if needed
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const EDAMAM_FOOD_DB_URL = 'https://api.edamam.com/api/food-database/v2/parser';
 const EDAMAM_APP_ID = process.env.EDAMAM_APP_ID;
 const EDAMAM_APP_KEY = process.env.EDAMAM_APP_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
+// ─── PILLAR 4: VISION INTEGRATION ──────────────────────────────────────────
+
+/**
+ * POST /api/nutrition/analyze-image
+ * Uses Gemini 1.5 Flash to identify food in an image and then fetches 
+ * precise nutrition data from Edamam.
+ */
+export const analyzeMealImage = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No image file provided" });
+    if (!GEMINI_API_KEY) return res.status(501).json({ error: "Vision Engine not configured. Please add GEMINI_API_KEY to your env." });
+
+    const imageUrl = req.file.path; // Cloudinary URL
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // 1. Fetch the image data to send to Gemini
+    const imageResponse = await fetch(imageUrl);
+    const imageBuffer = await imageResponse.arrayBuffer();
+
+    const prompt = `Analyze this food image. List the main food items you see and estimate their weight in grams or quantity. 
+    Return the result as a raw JSON string like this: 
+    [{"name": "grilled chicken", "quantity": 150, "unit": "g"}, {"name": "broccoli", "quantity": 100, "unit": "g"}] 
+    Just the JSON, no Markdown.`;
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: Buffer.from(imageBuffer).toString("base64"),
+          mimeType: req.file.mimetype,
+        },
+      },
+    ]);
+
+    const responseText = result.response.text();
+    const cleanedText = responseText.replace(/```json|```/g, "").trim();
+    const detectedItems = JSON.parse(cleanedText);
+
+    // 2. Map detected items to Edamam for high-precision nutrition
+    const enrichedResults = await Promise.all(detectedItems.map(async (item) => {
+      const searchUrl = `${EDAMAM_FOOD_DB_URL}?app_id=${EDAMAM_APP_ID}&app_key=${EDAMAM_APP_KEY}&ingr=${encodeURIComponent(item.name)}&nutrition-type=logging`;
+      const edResponse = await fetch(searchUrl);
+      if (!edResponse.ok) return null;
+      
+      const data = await edResponse.json();
+      if (!data.hints?.length) return null;
+      
+      const hint = data.hints[0];
+      const multiplier = item.unit === 'g' ? item.quantity / 100 : item.quantity;
+
+      return {
+        foodId: hint.food.foodId,
+        label: `${item.quantity}${item.unit} ${hint.food.label}`,
+        calories: Math.round(hint.food.nutrients.ENERC_KCAL * multiplier),
+        protein: Math.round(hint.food.nutrients.PROCNT * multiplier),
+        fat: Math.round(hint.food.nutrients.FAT * multiplier),
+        carbs: Math.round(hint.food.nutrients.CHOCDF * multiplier),
+        servingSize: item.quantity,
+        servingUnit: item.unit
+      };
+    }));
+
+    res.json({ 
+      imageUrl,
+      data: enrichedResults.filter(i => i !== null)
+    });
+
+  } catch (error) {
+    console.error("AI Vision Error:", error);
+    res.status(500).json({ error: "The vision engine encountered a processing error" });
+  }
+};
+
 
 // Simple in-memory cache to save on API limits
 const searchCache = new Map();

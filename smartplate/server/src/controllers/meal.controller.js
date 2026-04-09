@@ -35,7 +35,7 @@ const findOwnedLog = async (logId, userId) => {
 // POST /api/meal-logs
 export const createMealLog = async (req, res, next) => {
   try {
-    const { mealType, loggedAt, notes } = req.body;
+    const { mealType, loggedAt, notes, imageUrl } = req.body;
 
     const [newLog] = await db
       .insert(mealLogs)
@@ -44,6 +44,7 @@ export const createMealLog = async (req, res, next) => {
         mealType,
         loggedAt: loggedAt ? new Date(loggedAt) : new Date(),
         notes:    notes ?? null,
+        imageUrl: imageUrl ?? null,
       })
       .returning();
 

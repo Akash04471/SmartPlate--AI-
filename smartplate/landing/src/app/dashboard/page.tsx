@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { 
   LayoutDashboard, Utensils, TrendingUp, Trophy, Settings, 
-  LogOut, Search, Bell, Flame, Target, Zap, Plus, X, Sparkles, ChevronRight
+  LogOut, Search, Bell, Flame, Target, Zap, Plus, X, Sparkles, ChevronRight, Camera, Image as ImageIcon
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -14,7 +14,7 @@ import {
   getProfile, getDailyStats, getWeeklyStats, getMealLogs, 
   createMealLog, addMealLogItem, getUser, logout, getToken,
   searchNutrition, interpretMeal, logWeight, getWeightHistory, getAdherenceStats,
-  upsertProfile
+  upsertProfile, analyzeImage, getCoachInsights
 
 } from "@/utils/api";
 
@@ -452,15 +452,24 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
                 <div className="space-y-3">
                   {todayMeals.map((meal: any) => (
                     <div key={meal.id} className="group">
-                      <div className="flex-1 border border-white/5 p-4 flex justify-between items-center bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all rounded-2xl relative overflow-hidden">
+                      <div className="flex-1 border border-white/5 p-4 flex justify-between items-center bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all rounded-2xl relative overflow-hidden gap-4">
                         <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/20" />
-                        <div>
-                          <div className="flex items-center gap-2">
-                             <p className="text-xs font-black italic tracking-tighter uppercase">{meal.mealType}</p>
-                             <span className="text-[9px] text-white/20 font-bold">{new Date(meal.loggedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}</span>
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          {meal.imageUrl && (
+                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 shrink-0">
+                               <img src={meal.imageUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                               <p className="text-xs font-black italic tracking-tighter uppercase truncate">{meal.mealType}</p>
+                               <span className="text-[9px] text-white/20 font-bold">{new Date(meal.loggedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}</span>
+                               {meal.imageUrl && <Zap size={10} className="text-emerald-400/60" />}
+                            </div>
+                            <p className="text-[10px] text-white/40 mt-1 font-bold truncate">{meal.notes || (meal.imageUrl ? "AI Visual Entry" : "Standard Protocol")}</p>
                           </div>
-                          <p className="text-[10px] text-white/40 mt-1 font-bold">{meal.notes || "Standard Protocol"}</p>
                         </div>
+
                         <div className="text-right">
                           <p className={`text-sm font-black italic tracking-tighter ${getAlignmentColor(meal)}`}>{meal.totals?.calories || 0} kcal</p>
                           <div className="w-1.5 h-1.5 rounded-full bg-current ml-auto mt-1 opacity-20" />
@@ -841,8 +850,11 @@ function AddMealModal({
   const [isSearching, setIsSearching] = useState(false);
 
 
-  const [isAiMode, setIsAiMode] = useState(false);
   const [aiInput, setAiInput] = useState("");
+  const [isAiMode, setIsAiMode] = useState(true);
+  const [visionMode, setVisionMode] = useState(false); // New: Image vs Text AI
+  const [visionFile, setVisionFile] = useState<File | null>(null);
+  const [visionImageUrl, setVisionImageUrl] = useState<string | null>(null);
   const [isInterpreting, setIsInterpreting] = useState(false);
 
   const handleAiInterpret = async () => {
@@ -932,7 +944,7 @@ function AddMealModal({
     setLoading(true);
     setError("");
     try {
-      const res = await createMealLog(mealType);
+      const res = await createMealLog(mealType, undefined, visionImageUrl || undefined);
       const logId = res.data.id;
       
       // Add all items in parallel
@@ -1035,29 +1047,87 @@ function AddMealModal({
               </label>
               <button 
                 onClick={() => setIsAiMode(!isAiMode)}
-                className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5"
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isAiMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/20'}`}
               >
                 <Sparkles size={12} />
-                {isAiMode ? "Standard Search" : "Smart AI Entry"}
+                {isAiMode ? "Smart AI Entry" : "Standard Entry"}
               </button>
             </div>
 
             {isAiMode ? (
               <div className="space-y-4">
-                <textarea 
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  placeholder="e.g. 3 large eggs and an avocado..."
-                  className="w-full h-32 bg-white/[0.02] border border-white/5 p-4 rounded-xl focus:border-emerald-500/30 outline-none text-sm resize-none custom-scrollbar"
-                />
-                <button 
-                  onClick={handleAiInterpret}
-                  disabled={isInterpreting || !aiInput.trim()}
-                  className="w-full py-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
-                >
-                  {isInterpreting ? "Interpreting Algorithm..." : "Run AI Interpretation"}
-                </button>
+                <div className="flex gap-2">
+                   <button 
+                     onClick={() => setVisionMode(false)}
+                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${!visionMode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/[0.02] border-white/5 text-white/20'}`}
+                   >Text Prompt</button>
+                   <button 
+                     onClick={() => setVisionMode(true)}
+                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${visionMode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/[0.02] border-white/5 text-white/20'}`}
+                   >Visual AI</button>
+                </div>
+
+                {!visionMode ? (
+                  <>
+                    <textarea 
+                      value={aiInput}
+                      onChange={(e) => setAiInput(e.target.value)}
+                      placeholder="e.g. 3 large eggs and an avocado..."
+                      className="w-full h-32 bg-white/[0.02] border border-white/5 p-4 rounded-xl focus:border-emerald-500/30 outline-none text-sm resize-none custom-scrollbar"
+                    />
+                    <button 
+                      onClick={handleAiInterpret}
+                      disabled={isInterpreting || !aiInput.trim()}
+                      className="w-full py-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                    >
+                      {isInterpreting ? "Interpreting Algorithm..." : "Run AI Interpretation"}
+                    </button>
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative group">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setVisionFile(file);
+                            try {
+                              setIsInterpreting(true);
+                              const res = await analyzeImage(file);
+                              setVisionImageUrl(res.imageUrl);
+                              setItems(res.data);
+                            } catch (err: any) {
+                              alert(err.message);
+                            } finally {
+                              setIsInterpreting(false);
+                            }
+                          }
+                        }}
+                      />
+                      <div className="w-full h-40 border-2 border-dashed border-white/5 group-hover:border-emerald-500/30 bg-white/[0.02] rounded-2xl flex flex-col items-center justify-center gap-4 transition-all">
+                        {visionFile ? (
+                           <div className="flex flex-col items-center">
+                              <div className="w-20 h-20 rounded-xl overflow-hidden border border-white/10 mb-2">
+                                <img src={URL.createObjectURL(visionFile)} alt="" className="w-full h-full object-cover" />
+                              </div>
+                              <p className="text-[10px] font-black text-emerald-400 uppercase">{visionFile.name}</p>
+                           </div>
+                        ) : (
+                          <>
+                            <Camera size={32} className="text-white/20 group-hover:text-emerald-400" />
+                            <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Snap or Upload Plate</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {isInterpreting && <p className="text-center text-[10px] font-black text-emerald-400 uppercase animate-pulse">Running Vision Engine...</p>}
+                  </div>
+                )}
               </div>
+
             ) : (
               <>
                 <div className="relative mb-4">

@@ -10,6 +10,8 @@ import protocolRoutes from './routes/protocol.routes.js';
 import nutritionRoutes from './routes/nutrition.routes.js';
 import progressRoutes  from './routes/progress.routes.js';
 import coachRoutes     from './routes/coach.routes.js';
+import tribeRoutes     from './routes/tribe.routes.js';
+
 
 
 const app = express();
@@ -54,6 +56,8 @@ app.use('/api/protocols', apiLimiter,  protocolRoutes);
 app.use('/api/nutrition', apiLimiter,  nutritionRoutes);
 app.use('/api/progress',  apiLimiter,  progressRoutes);
 app.use('/api/coach',     apiLimiter,  coachRoutes);
+app.use('/api/tribes',    apiLimiter,  tribeRoutes);
+
 
 
 // ── Global error handler — always last ───────────────────────────────────────

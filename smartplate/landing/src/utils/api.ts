@@ -214,4 +214,23 @@ export async function getCoachInsights() {
   }>("/coach/insights");
 }
 
+// ─── Social Tribes ─────────────────────────────────────────────────────────
+
+export async function listTribes() {
+  return apiFetch<{ data: any[] }>("/tribes");
+}
+
+export async function joinTribe(slug: string) {
+  return apiFetch(`/tribes/${slug}/join`, { method: "POST" });
+}
+
+export async function getLeaderboard(slug: string) {
+  return apiFetch<{ tribe: string; data: any[] }>(`/tribes/${slug}/leaderboard`);
+}
+
+export async function seedTribes() {
+  return apiFetch("/tribes/seed", { method: "POST" });
+}
+
+
 

@@ -61,8 +61,10 @@ const sidebarItems = [
   { icon: <Utensils size={20} />, label: "Diet Plan", id: "diet" },
   { icon: <TrendingUp size={20} />, label: "Progress", id: "progress" },
   { icon: <Trophy size={20} />, label: "Awards", id: "awards" },
+  { icon: <Sparkles size={20} />, label: "Community", id: "community" },
   { icon: <Settings size={20} />, label: "Settings", id: "settings" },
 ];
+
 
 
 // ─── MAIN DASHBOARD ─────────────────────────────────────────────────────────
@@ -85,6 +87,9 @@ export default function DashboardPage() {
   const [isCheatDayUnlocked, setIsCheatDayUnlocked] = useState(false);
   const [historyMeals, setHistoryMeals] = useState<MealLog[]>([]);
   const [coachInsights, setCoachInsights] = useState<any>(null);
+  const [tribes, setTribes] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any>(null);
+
 
 
 
@@ -253,7 +258,10 @@ export default function DashboardPage() {
       {/* ─── MAIN CONTENT ───────────────────────────────────── */}
       <main className="flex-1 p-10 overflow-y-auto">
         <AnimatePresence mode="wait">
-          {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} historyMeals={historyMeals} suggestions={suggestions} coachInsights={coachInsights} goalLabel={goalLabel} onAddMeal={() => setShowAddMeal(true)} onToggleCoach={() => loadData()} />}
+          {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} historyMeals={historyMeals} suggestions={suggestions} coachInsights={coachInsights} goalLabel={goalLabel} onAddMeal={() => setShowAddMeal(true)} onToggleCoach={() => loadData()} setActiveTab={setActiveTab} />}
+
+          {activeTab === "community" && <CommunityTab key="community" />}
+
 
 
           {activeTab === "diet" && <DietPlanTab key="diet" profile={profile} goalLabel={goalLabel} />}
@@ -283,7 +291,8 @@ export default function DashboardPage() {
 
 // ─── TAB COMPONENTS ─────────────────────────────────────────────────────────
 
-function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTarget, proteinCurrent, proteinTarget, mealCount, yesterdayData, todayMeals, historyMeals, suggestions, goalLabel, onAddMeal }: any) {
+function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTarget, proteinCurrent, proteinTarget, mealCount, yesterdayData, todayMeals, historyMeals, suggestions, coachInsights, goalLabel, onAddMeal, setActiveTab }: any) {
+
   const getAlignmentColor = (meal: any) => {
     if (!profile?.dailyCalorieTarget) return "text-white/40";
     const targetPerMeal = profile.dailyCalorieTarget / 4;
@@ -1121,3 +1130,147 @@ function AddMealModal({
     </motion.div>
   );
 }
+
+// ─── COMMUNITY TAB ──────────────────────────────────────────────────────────
+
+import { listTribes, joinTribe, getLeaderboard } from "@/utils/api";
+
+function CommunityTab() {
+  const [tribes, setTribes] = useState<any[]>([]);
+  const [selectedTribe, setSelectedTribe] = useState<any>(null);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadTribes();
+  }, []);
+
+  const loadTribes = async () => {
+    try {
+      setLoading(true);
+      const res = await listTribes();
+      setTribes(res.data);
+      if (res.data.length > 0 && !selectedTribe) {
+        handleSelectTribe(res.data[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectTribe = async (tribe: any) => {
+    setSelectedTribe(tribe);
+    try {
+      const res = await getLeaderboard(tribe.slug);
+      setLeaderboard(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleJoin = async (slug: string) => {
+    setJoining(slug);
+    try {
+      await joinTribe(slug);
+      loadTribes(); // refresh counts
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setJoining(null);
+    }
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-96">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+    </div>
+  );
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
+      <header className="max-w-3xl">
+        <h2 className="text-4xl font-black italic tracking-tighter mb-4" style={{ fontFamily: 'var(--font-display)' }}>The Social Protocol</h2>
+        <p className="text-white/40 text-lg">Health is a team sport. Join an official Tribe to compare notes, sync progress, and climb the local leaderboards.</p>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex justify-between items-center mb-6">
+             <h3 className="text-xs font-black uppercase tracking-[0.3em] text-white/20">Discovery Feed</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {tribes.map((tribe) => (
+              <div 
+                key={tribe.id} 
+                onClick={() => handleSelectTribe(tribe)}
+                className={`p-8 border rounded-[2.5rem] transition-all cursor-pointer group relative overflow-hidden ${
+                  selectedTribe?.slug === tribe.slug 
+                    ? 'border-emerald-500/40 bg-emerald-500/[0.03]' 
+                    : 'border-white/5 bg-white/[0.01] hover:border-white/10'
+                }`}
+              >
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <h4 className="text-xl font-black italic tracking-tighter group-hover:text-emerald-400 transition-colors">{tribe.name}</h4>
+                    <div className="px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold text-white/40">{tribe.memberCount} Members</div>
+                  </div>
+                  <p className="text-xs text-white/30 leading-relaxed mb-8 h-10 overflow-hidden line-clamp-2">{tribe.description}</p>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleJoin(tribe.slug); }}
+                    disabled={joining === tribe.slug}
+                    className={`w-full py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                      joining === tribe.slug ? 'opacity-50' : 'hover:scale-[1.02]'
+                    } ${
+                      selectedTribe?.slug === tribe.slug ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-white/5 text-white/40 hover:bg-white/10'
+                    }`}
+                  >
+                    {joining === tribe.slug ? "Processing..." : "Join Tribe"}
+                  </button>
+                </div>
+                <div className="absolute -bottom-4 -right-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                   <Target size={100} strokeWidth={1} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <h3 className="text-xs font-black uppercase tracking-[0.3em] text-white/20 mb-6">Tribe Champions</h3>
+          <div className="border border-white/5 bg-white/[0.01] rounded-[2.5rem] p-8">
+            <h4 className="text-sm font-black italic tracking-tighter text-emerald-400 mb-8 uppercase tracking-widest">{selectedTribe?.name} Rankings</h4>
+            <div className="space-y-6">
+              {leaderboard.length === 0 ? (
+                <p className="text-xs text-white/20 italic text-center py-10">Waiting for first cohort to verify...</p>
+              ) : (
+                leaderboard.map((user, i) => (
+                  <div key={i} className="flex items-center gap-4 group">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${
+                      i === 0 ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 
+                      i === 1 ? 'bg-white/20 text-white' : 
+                      i === 2 ? 'bg-white/10 text-white/60' : 'bg-white/5 text-white/20'
+                    }`}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1">
+                       <p className="text-sm font-bold group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{user.userName}</p>
+                       <p className="text-[10px] text-white/20 font-black tracking-widest uppercase">{user.points} Protocol Points</p>
+                    </div>
+                    {i === 0 && <Trophy size={16} className="text-emerald-400" />}
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-10 pt-10 border-t border-white/5 text-center">
+               <p className="text-[10px] text-white/20 font-bold uppercase tracking-[0.3em]">Next Cycle: Monday 00:00</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+

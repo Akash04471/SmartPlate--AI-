@@ -160,3 +160,21 @@ export const healthProtocols = pgTable('health_protocols', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// ─── PILLAR 3: SOCIAL TRIBES ───────────────────────────────────────────────
+
+export const tribes = pgTable('tribes', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  name:        text('name').notNull(),
+  slug:        text('slug').notNull().unique(),
+  description: text('description'),
+  image:       text('image'), // placeholder for tribe avatar
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+});
+
+export const tribeMemberships = pgTable('tribe_memberships', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tribeId:   uuid('tribe_id').notNull().references(() => tribes.id, { onDelete: 'cascade' }),
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  joinedAt:  timestamp('joined_at').defaultNow().notNull(),
+});

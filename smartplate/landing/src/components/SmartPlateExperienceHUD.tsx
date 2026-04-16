@@ -115,7 +115,7 @@ export default function SmartPlateExperienceHUD({ scrollYProgress }: HUDProps) {
 
             {/* ─── PHASE 1: INGREDIENTS ─────────────────────────────── */}
             <motion.div
-                className="absolute inset-0 flex flex-col items-center justify-center text-center px-6"
+                className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pt-32 pb-12"
                 style={{ opacity: phase1Opacity }}
             >
                 <motion.p
@@ -131,7 +131,7 @@ export default function SmartPlateExperienceHUD({ scrollYProgress }: HUDProps) {
                 {phaseContent.ingredients.lines.map((line, i) => (
                     <motion.p
                         key={i}
-                        className="heading-display !text-[8vw] md:!text-[6vw] mb-4"
+                        className="heading-display !text-[clamp(1.5rem,6vw,4.5rem)] mb-2 md:mb-4 leading-[1.1]"
                         style={{
                             opacity: useTransform(
                                 scrollYProgress,
@@ -152,7 +152,7 @@ export default function SmartPlateExperienceHUD({ scrollYProgress }: HUDProps) {
 
             {/* ─── PHASE 2: INTELLIGENCE ────────────────────────────── */}
             <motion.div
-                className="absolute inset-0 flex flex-col justify-center px-6"
+                className="absolute inset-0 flex flex-col justify-center px-6 pt-32 pb-12"
                 style={{ opacity: phase2Opacity }}
             >
                 <div className="max-w-6xl mx-auto w-full relative">
@@ -226,7 +226,7 @@ export default function SmartPlateExperienceHUD({ scrollYProgress }: HUDProps) {
                         <p className="text-xs text-white/40 mb-6 font-semibold tracking-widest uppercase" style={{ fontFamily: 'var(--font-label)' }}>
                             {phaseContent.intelligence.hudLabel}
                         </p>
-                        <h2 className="heading-display !text-6xl md:!text-7xl mb-6">
+                        <h2 className="heading-display !text-[clamp(2rem,7vw,5rem)] mb-4 md:mb-6 leading-tight">
                             {phaseContent.intelligence.centerHeading}
                         </h2>
                         <p className="body-refined text-text-secondary text-base max-w-lg mx-auto">
@@ -252,7 +252,7 @@ export default function SmartPlateExperienceHUD({ scrollYProgress }: HUDProps) {
 
             {/* ─── PHASE 3: TRANSFORMATION ──────────────────────────── */}
             <motion.div
-                className="absolute inset-0 flex flex-col items-center justify-center text-center px-6"
+                className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pt-32 pb-12"
                 style={{ opacity: phase3Opacity }}
             >
                 <motion.p
@@ -267,7 +267,7 @@ export default function SmartPlateExperienceHUD({ scrollYProgress }: HUDProps) {
                 {phaseContent.transformation.lines.map((line, i) => (
                     <motion.p
                         key={i}
-                        className="heading-display !text-[8vw] md:!text-[6vw] mb-4"
+                        className="heading-display !text-[clamp(1.5rem,6vw,4.5rem)] mb-2 md:mb-4 leading-[1.1]"
                         style={{
                             opacity: useTransform(
                                 scrollYProgress,
@@ -312,7 +312,7 @@ export default function SmartPlateExperienceHUD({ scrollYProgress }: HUDProps) {
                     {phaseContent.smartplate.hudLabel}
                 </motion.p>
                 <motion.h2
-                    className="heading-display !text-[10vw] mb-4"
+                    className="heading-display !text-[clamp(2.5rem,10vw,8rem)] mb-4 leading-none"
                     style={{
                         opacity: useTransform(scrollYProgress, [0.85, 0.9], [0, 1]),
                         y: useTransform(scrollYProgress, [0.85, 0.9], [20, 0]),

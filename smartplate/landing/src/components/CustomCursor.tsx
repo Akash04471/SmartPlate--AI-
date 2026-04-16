@@ -10,7 +10,8 @@ export default function CustomCursor() {
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
 
-    const springConfig = { damping: 25, stiffness: 250 };
+    // SLOW & LIQUID SPRING PHYSICS
+    const springConfig = { damping: 40, stiffness: 100 }; 
     const cursorX = useSpring(mouseX, springConfig);
     const cursorY = useSpring(mouseY, springConfig);
 
@@ -23,11 +24,11 @@ export default function CustomCursor() {
 
         const handleHover = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
-            const isClickable = target.closest("button, a, input, [role='button']");
+            const isClickable = target.closest("button, a, input, [role='button'], .clickable");
             setIsHovering(!!isClickable);
         };
 
-        window.addEventListener("mousemove", moveMouse);
+        window.addEventListener("mousemove", moveMouse, { passive: true });
         window.addEventListener("mouseover", handleHover);
 
         return () => {
@@ -41,7 +42,7 @@ export default function CustomCursor() {
     return (
         <>
             <motion.div
-                className="fixed top-0 left-0 w-8 h-8 rounded-full border border-white/30 pointer-events-none z-[9999] flex items-center justify-center"
+                className="fixed top-0 left-0 w-12 h-12 rounded-full border border-emerald-500/20 pointer-events-none z-[9999] flex items-center justify-center backdrop-blur-[2px]"
                 style={{
                     x: cursorX,
                     y: cursorY,
@@ -49,18 +50,21 @@ export default function CustomCursor() {
                     translateY: "-50%",
                 }}
                 animate={{
-                    scale: isHovering ? 2 : 1,
-                    backgroundColor: isHovering ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 255, 255, 0)",
-                    borderColor: isHovering ? "rgba(255, 255, 255, 0.6)" : "rgba(255, 255, 255, 0.3)",
+                    scale: isHovering ? 1.5 : 1,
+                    backgroundColor: isHovering ? "rgba(16, 185, 129, 0.05)" : "rgba(16, 185, 129, 0)",
+                    borderColor: isHovering ? "rgba(16, 185, 129, 0.5)" : "rgba(16, 185, 129, 0.2)",
                 }}
-                transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                transition={{ type: "spring", damping: 30, stiffness: 150 }}
             >
-                <div className="w-[1px] h-[1px] bg-white rounded-full" />
+                <motion.div 
+                    animate={{ scale: isHovering ? 0.5 : 1 }}
+                    className="w-1 h-1 bg-emerald-400 rounded-full" 
+                />
             </motion.div>
             
-            {/* Trailing Aura */}
+            {/* TRAILING SAP AURA */}
             <motion.div
-                className="fixed top-0 left-0 w-64 h-64 bg-white/5 rounded-full blur-[80px] pointer-events-none z-[9998]"
+                className="fixed top-0 left-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none z-[9998]"
                 style={{
                     x: cursorX,
                     y: cursorY,
@@ -71,3 +75,4 @@ export default function CustomCursor() {
         </>
     );
 }
+

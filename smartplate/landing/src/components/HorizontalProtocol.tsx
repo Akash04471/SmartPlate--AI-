@@ -12,29 +12,29 @@ gsap.registerPlugin(ScrollTrigger);
 const PROTOCOLS = [
   {
     step: "01",
-    title: "Nutrient Loading",
-    desc: "Initial 48-hour phase to reset insulin sensitivity and prepare your metabolism for efficient calorie processing.",
+    title: "Metabolic Primer",
+    desc: "A focused 48-hour protocol to optimize insulin sensitivity and prepare your physiological state for efficient nutrient utilization.",
     icon: <Zap />,
     accent: "emerald"
   },
   {
     step: "02",
-    title: "Macro Balancing",
-    desc: "Targeted protein and carbohydrate distribution based on your unique muscle mass and activity profile.",
+    title: "Macronutrient Alignment",
+    desc: "Strategic protein, lipid, and carbohydrate distribution calibrated to your specific physiological data and activity profile.",
     icon: <Utensils />,
     accent: "lime-accent"
   },
   {
     step: "03",
-    title: "Circadian Feeding",
-    desc: "Precision recalibration of calorie windows to match your internal clock and energy expenditure.",
+    title: "Chrononutrition",
+    desc: "Precision calibration of nutritional windows to synchronize with your circadian rhythm and peak energy expenditure.",
     icon: <Shield />,
     accent: "emerald"
   },
   {
     step: "04",
-    title: "Bio-Stat Optimization",
-    desc: "Refining micronutrient density to support cognitive focus and long-term metabolic vitality.",
+    title: "Precision Bio-Metrics",
+    desc: "Continuous refinement of micronutrient density to support cognitive function and long-term metabolic vitality.",
     icon: <Target />,
     accent: "lime-accent"
   }

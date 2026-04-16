@@ -69,10 +69,22 @@ export default function Navbar() {
                     </Link>
                     <Link
                         href="/auth/signup"
-                        className="px-8 py-3 bg-white text-black text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-transparent hover:text-white border border-white transition-all duration-300 rounded-full"
+                        className="relative group px-8 py-3 bg-white text-black text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-transparent hover:text-white border border-white transition-all duration-300 rounded-full overflow-hidden"
                         style={{ fontFamily: 'var(--font-label)' }}
                     >
-                        Get Started
+                        <motion.span
+                            className="absolute inset-0 bg-white/20"
+                            animate={{
+                                scale: [1, 1.5],
+                                opacity: [0.5, 0],
+                            }}
+                            transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: "easeOut",
+                            }}
+                        />
+                        <span className="relative z-10">Get Started</span>
                     </Link>
                 </div>
 

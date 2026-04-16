@@ -1,66 +1,76 @@
+// MetabolicRuler.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useScroll, useSpring, motion } from "framer-motion";
+import { motion, useMotionValue, useTransform } from "framer-motion";
+import { useRef, useEffect, useState } from "react";
 
-export default function MetabolicRuler() {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, {
-    stiffness: 100,
-    damping: 30,
-    restDelta: 0.001
-  });
+interface MetabolicRulerProps {
+  value: number;
+  onChange: (val: number) => void;
+  unit: string;
+  min?: number;
+  max?: number;
+  step?: number;
+}
 
-  const [coordinate, setCoordinate] = useState({ x: 0, y: 0 });
+export default function MetabolicRuler({
+  value,
+  onChange,
+  unit,
+  min = 0,
+  max = 1000,
+  step = 1,
+}: MetabolicRulerProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setCoordinate({
-        x: Math.round(window.scrollX),
-        y: Math.round(window.scrollY),
-      });
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  // Simple horizontal slider for now but with a "ruler" aesthetic
+  const ticks = Array.from({ length: 51 }, (_, i) => i);
 
   return (
-    <div className="fixed top-0 left-0 w-full z-[100] h-16 pointer-events-none">
-      {/* Horizontal Line */}
-      <div className="absolute top-0 left-0 w-full h-[1px] bg-white/5" />
-      
-      {/* Animated Progress Line */}
-      <motion.div 
-        style={{ scaleX }}
-        className="absolute top-0 left-0 w-full h-[0.5px] bg-white origin-left"
-      />
-
-      {/* Ruler Marks */}
-      <div className="absolute top-0 left-0 w-full flex justify-between px-6 pt-1">
-        {[...Array(31)].map((_, i) => (
-          <div key={i} className="flex flex-col items-center">
-            <div className={`w-[0.5px] bg-white/10 ${i % 5 === 0 ? 'h-3' : 'h-1.5'}`} />
-            {i % 5 === 0 && (
-              <span className="text-[9px] text-white/20 mt-1 uppercase tracking-tighter font-medium" style={{ fontFamily: 'var(--font-label)' }}>
-                {(i * 3.3).toFixed(0).padStart(3, '0')}
-              </span>
-            )}
-          </div>
-        ))}
+    <div className="relative w-full py-8 group">
+      <div className="flex justify-between items-end mb-4 px-2">
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Precision HUD</span>
+        <div className="flex items-baseline gap-1">
+          <span className="text-3xl font-black italic tracking-tighter text-emerald-400">{value}</span>
+          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{unit}</span>
+        </div>
       </div>
 
-      {/* Coordinate HUD */}
-      <div className="absolute top-10 left-8 flex gap-12">
-        <div className="flex flex-col">
-          <span className="text-[9px] text-white/20 font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-label)' }}>Nutrient Data</span>
-          <span className="text-[11px] text-white/60 font-medium" style={{ fontFamily: 'var(--font-label)' }}>
-            [ X:{coordinate.x.toString().padStart(4, '0')} - Y:{coordinate.y.toString().padStart(4, '0')} ]
-          </span>
+      <div className="relative h-12 bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden flex items-center px-4">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          onMouseDown={() => setIsDragging(true)}
+          onMouseUp={() => setIsDragging(false)}
+          className="w-full h-full opacity-0 absolute inset-0 z-20 cursor-ew-resize"
+        />
+        
+        <div className="absolute inset-0 flex items-center justify-between px-6 pointer-events-none">
+          {ticks.map((t) => (
+            <div 
+              key={t} 
+              className={`w-[1px] transition-all duration-300 ${
+                t % 10 === 0 ? 'h-6 bg-white/20' : t % 5 === 0 ? 'h-4 bg-white/10' : 'h-2 bg-white/5'
+              } ${Math.abs((value / max) * 50 - t) < 1 ? 'bg-emerald-400 h-8 opacity-100' : ''}`}
+            />
+          ))}
         </div>
-        <div className="flex flex-col">
-          <span className="text-[9px] text-white/20 font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--font-label)' }}>System Status</span>
-          <span className="text-[11px] text-white/60 font-medium" style={{ fontFamily: 'var(--font-label)' }}>STATUS: OPERATIONAL</span>
-        </div>
+        
+        <motion.div 
+          className="absolute top-0 bottom-0 w-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)] z-10"
+          style={{ left: `${(value / max) * 100}%` }}
+          animate={{ scaleY: isDragging ? 1.2 : 1 }}
+        />
+      </div>
+      
+      <div className="flex justify-between mt-3 px-2">
+        <span className="text-[8px] font-black text-white/10 uppercase tracking-widest">MIN: {min}</span>
+        <span className="text-[8px] font-black text-white/10 uppercase tracking-widest">MAX: {max}</span>
       </div>
     </div>
   );

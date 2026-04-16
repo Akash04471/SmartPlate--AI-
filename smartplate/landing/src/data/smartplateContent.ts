@@ -6,12 +6,12 @@ export const phaseContent = {
             "Every ingredient carries a signal.",
             "SmartPlate reads them all.",
         ],
-        hudLabel: "ANALYZING YOUR NUTRITION DNA",
+        hudLabel: "BIOMETRIC NUTRITION ANALYSIS",
         phaseTag: "PHASE 01 / 04 · INGREDIENTS",
     },
     intelligence: {
         leftDiagnostics: [
-            "CALORIC ARCHITECTURE — MAPPED",
+            "ENERGY METABOLISM — MAPPED",
             "MACRO DISTRIBUTION — OPTIMIZED",
             "METABOLIC RATE — CALIBRATING",
             "MICRONUTRIENT GAPS — DETECTED",
@@ -25,7 +25,7 @@ export const phaseContent = {
         centerHeading: "Your Body Has a Blueprint.",
         centerSubtext:
             "We decoded it. 47 health biomarkers processed in under 2 seconds.",
-        hudLabel: "NUTRITION INTELLIGENCE · ACTIVE",
+        hudLabel: "NUTRITIONAL INTELLIGENCE · ACTIVE",
         phaseTag: "PHASE 02 / 04 · INTELLIGENCE",
     },
     transformation: {
@@ -34,7 +34,7 @@ export const phaseContent = {
             "It's been waiting for the right fuel.",
             "Every meal from here is an upgrade.",
         ],
-        hudLabel: "METABOLIC ENGINE · IGNITED",
+        hudLabel: "METABOLIC OPTIMIZATION · ACTIVE",
         phaseTag: "PHASE 03 / 04 · TRANSFORMATION",
         subStat: "+340 kcal net burn · Today",
     },
@@ -70,7 +70,7 @@ export const foodGroupColors: Record<string, string> = {
 export const features = [
     {
         iconName: "Brain" as const,
-        title: "AI Diet Intelligence",
+        title: "Precision Nutrition Intelligence",
         description:
             "SmartPlate's model processes 47+ biomarkers — your metabolism, activity, sleep, and gut preferences — to generate a diet that evolves with you, week by week.",
         tag: "Adaptive AI",
@@ -91,7 +91,7 @@ export const features = [
     },
     {
         iconName: "Trophy" as const,
-        title: "Momentum Engine",
+        title: "Adherence Optimization",
         description:
             "Streaks, cheat meal unlocks, and transformation milestones keep your motivation compounding. The longer you stay, the better the rewards get.",
         tag: "Gamified",
@@ -176,4 +176,4 @@ export const trustBadges = [
 ];
 
 // ─── PHASE NAMES (for nav indicator) ──────────────────────────────
-export const phaseNames = ["INGREDIENTS", "INTELLIGENCE", "METABOLISM", "READY"];
+export const phaseNames = ["NUTRIENTS", "INTELLIGENCE", "METABOLISM", "READY"];

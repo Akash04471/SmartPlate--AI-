@@ -1,15 +1,46 @@
-import "dotenv/config";
 import http from "http";
+import { execSync } from "child_process";
 import app from "./app.js";
-import { env } from './config/env.js'; 
 
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT || 5051;
 
 const server = http.createServer(app);
 
 server.keepAliveTimeout = 0;
 server.headersTimeout = 0;
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`Server running on http://127.0.0.1:${PORT}`);
+// ── Error Handling ───────────────────────────────────────────────────────────
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`[FATAL] Port ${PORT} is already in use. Try starting again.`);
+    process.exit(1);
+  } else {
+    console.error("[FATAL] Server Error:", error);
+    process.exit(1);
+  }
+});
+
+// ── Lifecycle Management ─────────────────────────────────────────────────────
+const shutdown = (signal) => {
+  console.log(`\n[SIGNAL] Received ${signal}. Closing SmartPlate server...`);
+  server.close(() => {
+    console.log("[STATUS] Server closed. Port released. Goodbye!");
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    console.error("[ERROR] Forceful shutdown initiated.");
+    process.exit(1);
+  }, 5000).unref();
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// ── Initialization ───────────────────────────────────────────────────────────
+server.listen(PORT, "0.0.0.0", () => {
+  console.log("--------------------------------------------------");
+  console.log(`🚀 SmartPlate API: http://127.0.0.1:${PORT}`);
+  console.log(`📊 Mode: ${process.env.NODE_ENV || 'development'}`);
+  console.log("--------------------------------------------------");
 });

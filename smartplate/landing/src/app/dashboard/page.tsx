@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, Utensils, TrendingUp, Trophy, Settings, 
-  LogOut, Search, Bell, Flame, Target, Zap, Plus, X, Sparkles, ChevronRight, Camera, Image as ImageIcon
+  LogOut, Search, Bell, Flame, Target, Zap, Plus, X, Sparkles, ChevronRight, Camera, Image as ImageIcon, Activity,
+  Scale
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -14,12 +15,16 @@ import {
   getProfile, getDailyStats, getWeeklyStats, getMealLogs, 
   createMealLog, addMealLogItem, getUser, logout, getToken,
   searchNutrition, interpretMeal, logWeight, getWeightHistory, getAdherenceStats,
-  upsertProfile, analyzeImage, getCoachInsights
-
+  upsertProfile, analyzeImage, getCoachInsights, listTribes, joinTribe, getLeaderboard,
+  getProtocolSummary
 } from "@/utils/api";
 
 
 import { getSuggestions, getAllFoodsForDiet, getCheatSuggestions, type FoodSuggestion } from "@/utils/SuggestionEngine";
+import { scaleMacros, UNIT_MAP } from "@/utils/unitConverter";
+import GlassTilt from "@/components/GlassTilt";
+import FoodParticles from "@/components/FoodParticles";
+import MetabolicRuler from "@/components/MetabolicRuler";
 
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
@@ -58,6 +63,7 @@ interface MealLog {
 
 const sidebarItems = [
   { icon: <LayoutDashboard size={20} />, label: "Overview", id: "overview" },
+  { icon: <Plus size={20} />, label: "Log Intake", id: "intake" },
   { icon: <Utensils size={20} />, label: "Diet Plan", id: "diet" },
   { icon: <TrendingUp size={20} />, label: "Progress", id: "progress" },
   { icon: <Trophy size={20} />, label: "Awards", id: "awards" },
@@ -71,24 +77,30 @@ const sidebarItems = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("overview");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [todayMeals, setTodayMeals] = useState<MealLog[]>([]);
+  const [yesterdayMeals, setYesterdayMeals] = useState<MealLog[]>([]);
+  const [historyMeals, setHistoryMeals] = useState<MealLog[]>([]);
   const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddMeal, setShowAddMeal] = useState(false);
+  const [pendingItem, setPendingItem] = useState<any | null>(null);
   const [userName, setUserName] = useState("User");
   
   // New States
   const [weightHistory, setWeightHistory] = useState<any[]>([]);
   const [adherenceStats, setAdherenceStats] = useState<any>(null);
   const [isCheatDayUnlocked, setIsCheatDayUnlocked] = useState(false);
-  const [historyMeals, setHistoryMeals] = useState<MealLog[]>([]);
   const [coachInsights, setCoachInsights] = useState<any>(null);
   const [tribes, setTribes] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any>(null);
+  const [activeProtocols, setActiveProtocols] = useState<any[]>([]);
+  const [protocolSummary, setProtocolSummary] = useState<any>(null);
+  const [showCoachModal, setShowCoachModal] = useState(false);
 
 
 
@@ -102,7 +114,13 @@ export default function DashboardPage() {
     }
     const user = getUser();
     if (user) setUserName(user.name);
-  }, [router]);
+
+    // Sync active tab from URL
+    const tab = searchParams.get("tab");
+    if (tab && sidebarItems.find(i => i.id === tab)) {
+      setActiveTab(tab);
+    }
+  }, [router, searchParams]);
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -112,7 +130,7 @@ export default function DashboardPage() {
         getProfile(),
         getDailyStats(),
         getWeeklyStats(),
-        getMealLogs(1, 10),
+        getMealLogs(1, 50),
       ]);
 
       if (profileRes.status === "fulfilled") {
@@ -134,27 +152,42 @@ export default function DashboardPage() {
         setWeeklyData(formatted);
       }
 
-      if (mealsRes.status === "fulfilled") {
-        setTodayMeals(mealsRes.value.data);
-      }
       
-      // Fetch History & Progress Data
-      const [historyRes, weightRes, adherenceRes] = await Promise.allSettled([
-        getMealLogs(1, 20), // Fetch history (no date filter)
+      if (mealsRes.status === "fulfilled") {
+        const allFetched = mealsRes.value.data;
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const yesterday = today - 86400000;
+
+        const t: any[] = [];
+        const y: any[] = [];
+        const h: any[] = [];
+
+        allFetched.forEach((m: any) => {
+          const d = new Date(m.loggedAt);
+          const mealDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+          
+          if (mealDate === today) t.push(m);
+          else if (mealDate === yesterday) y.push(m);
+          else h.push(m);
+        });
+
+        setTodayMeals(t);
+        setYesterdayMeals(y);
+        setHistoryMeals(h);
+      }
+
+      // Restore missing history, weight and adherence fetches
+      const [weightRes, adherenceRes] = await Promise.allSettled([
         getWeightHistory(),
         getAdherenceStats()
       ]);
       
-      if (historyRes.status === "fulfilled") {
-        // Filter out today's meals from history to avoid duplicates
-        const todayIds = new Set(todayMeals.map(m => m.id));
-        setHistoryMeals(historyRes.value.data.filter((m: any) => !todayIds.has(m.id)));
-      }
-      
-      if (weightRes.status === "fulfilled") setWeightHistory(weightRes.value);
+      if (weightRes.status === "fulfilled") setWeightHistory(weightRes.value as any);
       if (adherenceRes.status === "fulfilled") {
-        setAdherenceStats(adherenceRes.value);
-        setIsCheatDayUnlocked(adherenceRes.value.awards.some((a: any) => a.type === 'cheat_day_unlock'));
+        const data = adherenceRes.value as any;
+        setAdherenceStats(data);
+        setIsCheatDayUnlocked(data.awards?.some((a: any) => a.type === 'cheat_day_unlock'));
       }
 
       // Fetch AI Coach Insights
@@ -163,6 +196,17 @@ export default function DashboardPage() {
         setCoachInsights(coachRes);
       } catch (err) {
         console.error("Coach insights load error:", err);
+      }
+
+      // Fetch Protocol Data
+      try {
+        const protoRes = await getProtocolSummary();
+        if (protoRes.data) {
+          setActiveProtocols(protoRes.data.activeProtocols || []);
+          setProtocolSummary(protoRes.data);
+        }
+      } catch (err) {
+        console.error("Protocol summary load error:", err);
       }
 
 
@@ -224,7 +268,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-base-dark text-white">
+    <div className="flex min-h-screen bg-base-dark text-white relative overflow-hidden">
+      {/* Living Background */}
+      <FoodParticles count={6} />
+      
       {/* ─── SIDEBAR ────────────────────────────────────────── */}
       <aside className="w-64 border-r border-white/5 bg-[#080808] flex flex-col p-6">
         <div className="mb-12">
@@ -258,13 +305,37 @@ export default function DashboardPage() {
       {/* ─── MAIN CONTENT ───────────────────────────────────── */}
       <main className="flex-1 p-10 overflow-y-auto">
         <AnimatePresence mode="wait">
-          {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} historyMeals={historyMeals} suggestions={suggestions} coachInsights={coachInsights} goalLabel={goalLabel} onAddMeal={() => setShowAddMeal(true)} onToggleCoach={() => loadData()} setActiveTab={setActiveTab} />}
+          {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} yesterdayMeals={yesterdayMeals} historyMeals={historyMeals} suggestions={suggestions} coachInsights={coachInsights} goalLabel={goalLabel} activeProtocols={activeProtocols} protocolSummary={protocolSummary} onAddMeal={(item?: any) => { setPendingItem(item || null); setShowAddMeal(true); }} onToggleCoach={() => loadData()} setActiveTab={setActiveTab} onShowCoach={() => setShowCoachModal(true)} />}
 
-          {activeTab === "community" && <CommunityTab key="community" />}
+          {activeTab === "intake" && (
+            <IntakeTab 
+              key="intake" 
+              profile={profile} 
+              onSuccess={() => { loadData(); setActiveTab("overview"); }} 
+              pendingItem={pendingItem} 
+            />
+          )}
+
+          {activeTab === "community" && <CommunityTab key="community" userName={userName} />}
 
 
 
-          {activeTab === "diet" && <DietPlanTab key="diet" profile={profile} goalLabel={goalLabel} />}
+          {activeTab === "diet" && (
+            <DietPlanTab 
+              key="diet" 
+              profile={profile} 
+              goalLabel={goalLabel} 
+              activeProtocols={activeProtocols}
+              todayMeals={todayMeals}
+              yesterdayMeals={yesterdayMeals}
+              historyMeals={historyMeals}
+              onAddMeal={(item?: any) => { setPendingItem(item || null); setShowAddMeal(true); }}
+              calCurrent={calCurrent}
+              calTarget={calTarget}
+              proteinCurrent={proteinCurrent}
+              proteinTarget={proteinTarget}
+            />
+          )}
           {activeTab === "progress" && <ProgressTab key="progress" weightHistory={weightHistory} adherenceStats={adherenceStats} onLogWeight={(w: number) => { logWeight(w); loadData(); }} />}
 
           {activeTab === "awards" && <AwardsTab key="awards" adherenceStats={adherenceStats} isUnlocked={isCheatDayUnlocked} profile={profile} />}
@@ -276,9 +347,19 @@ export default function DashboardPage() {
       <AnimatePresence>
         {showAddMeal && (
           <AddMealModal 
-            onClose={() => setShowAddMeal(false)} 
-            onSuccess={() => { setShowAddMeal(false); loadData(); }}
+            onClose={() => { setShowAddMeal(false); setPendingItem(null); }} 
+            onSuccess={() => { setShowAddMeal(false); setPendingItem(null); loadData(); }}
             profile={profile}
+            pendingItem={pendingItem}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showCoachModal && (
+          <CoachModal 
+            onClose={() => setShowCoachModal(false)}
+            coachInsights={coachInsights}
           />
         )}
       </AnimatePresence>
@@ -291,17 +372,17 @@ export default function DashboardPage() {
 
 // ─── TAB COMPONENTS ─────────────────────────────────────────────────────────
 
-function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTarget, proteinCurrent, proteinTarget, mealCount, yesterdayData, todayMeals, historyMeals, suggestions, coachInsights, goalLabel, onAddMeal, setActiveTab }: any) {
+function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTarget, proteinCurrent, proteinTarget, mealCount, yesterdayData, todayMeals, yesterdayMeals, historyMeals, suggestions, coachInsights, goalLabel, activeProtocols, protocolSummary, onAddMeal, setActiveTab, onShowCoach }: any) {
 
   const getAlignmentColor = (meal: any) => {
-    if (!profile?.dailyCalorieTarget) return "text-white/40";
+    if (!profile?.dailyCalorieTarget) return "text-emerald-400/40";
     const targetPerMeal = profile.dailyCalorieTarget / 4;
     const calories = meal.totals?.calories || 0;
     const diff = Math.abs(calories - targetPerMeal) / targetPerMeal;
 
-    if (diff <= 0.15) return "text-emerald-400"; // Green: Aligned
-    if (diff <= 0.30) return "text-amber-400";   // Yellow: Moderate
-    return "text-rose-400";                     // Red: Opposing
+    if (diff <= 0.15) return "text-emerald-400"; 
+    if (diff <= 0.30) return "text-amber-400";   
+    return "text-rose-400";                     
   };
 
   const greeting = () => {
@@ -311,192 +392,178 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
     return "Good evening";
   };
 
+  const currentProtocol = activeProtocols?.[0];
+
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }} 
+      initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }} 
-      exit={{ opacity: 0, y: -10 }}
-      className="space-y-10"
+      exit={{ opacity: 0, scale: 0.98 }}
+      className="space-y-16 pb-20"
     >
-      <header className="flex justify-between items-center">
+      <header className="flex justify-between items-end">
         <div>
-          <p className="text-xs text-white/30 mb-2 tracking-wider font-bold uppercase" style={{ fontFamily: 'var(--font-label)' }}>
-            System Status: {calPct > 90 ? "Optimal Protocol" : "Standby"}
-          </p>
-          <h1 className="text-5xl font-black text-white tracking-tighter italic" style={{ fontFamily: 'var(--font-display)' }}>{greeting()}, {userName.split(" ")[0]}.</h1>
+          <motion.p 
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="text-[10px] text-emerald-400/60 mb-4 tracking-[0.4em] font-black uppercase"
+          >
+            System Status: {calPct > 95 ? "Physiological Equilibrium" : "Metabolic Sync Active"}
+          </motion.p>
+          <h1 className="text-6xl font-black text-white tracking-tighter italic leading-none" style={{ fontFamily: 'var(--font-display)' }}>
+            {greeting()}, <span className="text-emerald-400">{userName.split(" ")[0]}</span>.
+          </h1>
         </div>
-        <div className="flex gap-4 items-center">
-          <div className="text-right mr-4 hidden md:block">
-            <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">Active Protocol</p>
-            <p className="text-sm font-bold text-emerald-400/80">{goalLabel(profile?.goalType || null)}</p>
+        <div className="flex gap-6 items-center">
+          <div className="text-right hidden md:block">
+            <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.3em] mb-1">Active Mandate</p>
+            <p className="text-sm font-black italic tracking-tight text-white/80">{currentProtocol ? currentProtocol.title : goalLabel(profile?.goalType || null)}</p>
           </div>
-          <button className="p-3 border border-white/5 hover:border-emerald-400/20 bg-white/[0.02] transition-all relative rounded-xl group">
-            <Bell size={20} className="text-white/30 group-hover:text-emerald-400/60" />
-            <div className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full" />
+          <button className="p-4 border border-white/5 hover:border-emerald-400/20 bg-white/[0.02] transition-all relative rounded-2xl group overflow-hidden">
+            <div className="absolute inset-0 bg-emerald-400/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+            <Bell size={20} className="text-white/20 group-hover:text-emerald-400 transition-colors relative z-10" />
+            <div className="absolute top-3 right-3 w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
           </button>
         </div>
       </header>
 
-      {/* AI COACH INSIGHT CARD */}
-      <div className="p-1 border border-white/5 bg-white/[0.01] rounded-[2.5rem] relative overflow-hidden group/coach">
-        <div className="p-8 flex flex-col md:flex-row gap-8 items-center justify-between relative z-10">
-          <div className="flex gap-6 items-center">
-            <div className={`p-5 rounded-3xl ${coachInsights?.enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-white/20'}`}>
-               <Sparkles size={32} />
+      {/* AI COACH: Holographic Insight */}
+      <motion.div 
+        whileHover={{ y: -4 }}
+        onClick={onShowCoach}
+        className="p-[1px] bg-gradient-to-r from-emerald-500/20 via-white/5 to-emerald-500/20 rounded-[3rem] relative group/coach shadow-2xl cursor-pointer"
+      >
+        <div className="bg-[#080808] rounded-[3rem] p-10 flex flex-col md:flex-row gap-10 items-center justify-between relative overflow-hidden">
+          <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover/coach:opacity-100 transition-opacity" />
+          <div className="flex gap-10 items-center relative z-10">
+            <div className={`p-6 rounded-[2rem] border transition-all duration-700 ${coachInsights?.enabled ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/5 text-white/20'}`}>
+               {coachInsights?.enabled ? <Activity size={40} strokeWidth={1.5} className="animate-pulse" /> : <Sparkles size={40} strokeWidth={1.5} />}
             </div>
-            <div>
-              <h3 className="text-xl font-black italic tracking-tighter text-white mb-2" style={{ fontFamily: 'var(--font-display)' }}>AI Health Coach</h3>
-              <p className="max-w-xl text-sm font-medium text-white/60 leading-relaxed italic">
+            <div className="max-w-xl">
+              <div className="flex items-center gap-3 mb-2">
+                <h3 className="text-2xl font-black italic tracking-tighter text-white" style={{ fontFamily: 'var(--font-display)' }}>AI Nutrition Analyst</h3>
+                {coachInsights?.protocolActive && (
+                  <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[8px] font-black text-emerald-400 uppercase tracking-widest">Protocol-Aware</span>
+                )}
+              </div>
+              <p className="text-base font-medium text-white/50 leading-relaxed italic">
                 {coachInsights?.enabled 
                   ? coachInsights.data?.advice 
-                  : "Enable the AI Coach in the settings to get personalized daily nutritional advice and meal suggestions."}
+                  : "Sync the Nutrition Assistant to initiate metabolic tracking and algorithmic guidance."}
               </p>
             </div>
           </div>
-          {!coachInsights?.enabled && (
-            <button 
-              onClick={() => setActiveTab('settings')}
-              className="px-8 py-4 bg-white/[0.03] border border-white/10 hover:border-white/20 text-white/60 hover:text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all"
-            >Configure Coach</button>
-          )}
-          {coachInsights?.enabled && coachInsights.data?.suggestion && (
-            <div className="px-6 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center">
-               <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400/60 mb-1">Focus Target</p>
-               <p className="text-lg font-black italic tracking-tighter text-emerald-400">+{coachInsights.data.suggestion.amount}{coachInsights.data.suggestion.unit} {coachInsights.data.suggestion.type}</p>
-            </div>
-          )}
-        </div>
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover/coach:opacity-20 transition-opacity">
-           <Zap size={120} strokeWidth={1} />
-        </div>
-      </div>
-
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Calories", value: calCurrent.toLocaleString(), sub: `/ ${calTarget.toLocaleString()} kcal`, icon: <Flame className="text-emerald-400" size={18}/>, pct: calPct, color: "bg-emerald-400/40" },
-          { label: "Protein", value: `${proteinCurrent}g`, sub: `/ ${proteinTarget}g`, icon: <Zap className="text-blue-400" size={18}/>, pct: proteinPct, color: "bg-blue-400/40" },
-          { label: "Efficiency", value: `${Math.round(calPct)}%`, sub: "utilization", icon: <TrendingUp className="text-amber-400" size={18}/>, pct: calPct, color: "bg-amber-400/40" },
-          { label: "Goal Progress", value: "Phase 1", sub: "tracking active", icon: <Target className="text-white/40" size={18}/>, pct: 100, color: "bg-white/20" },
-        ].map((stat, i) => (
-          <div key={i} className="p-8 border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group rounded-[2rem] relative overflow-hidden">
-            <div className="flex justify-between items-start mb-6">
-              <span className="text-[10px] tracking-[0.2em] text-white/30 uppercase font-black" style={{ fontFamily: 'var(--font-label)' }}>{stat.label}</span>
-              <div className="p-2.5 border border-white/5 group-hover:border-emerald-400/20 transition-colors rounded-xl">{stat.icon}</div>
-            </div>
-            <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-4xl font-black italic tracking-tighter" style={{ fontFamily: 'var(--font-display)' }}>{stat.value}</span>
-              <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">{stat.sub}</span>
-            </div>
-            <div className="h-[2px] w-full bg-white/5 overflow-hidden rounded-full">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${stat.pct}%` }} transition={{ duration: 1.5, delay: i * 0.1 }} className={`h-full ${stat.color}`} />
-            </div>
+          <div className="flex flex-col gap-4 relative z-10 w-full md:w-64">
+            {!coachInsights?.enabled ? (
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className="w-full py-5 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-400 hover:text-white transition-all shadow-xl"
+              >Initialize Assistant</button>
+            ) : (
+              <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl text-center backdrop-blur-md">
+                 <p className="text-[9px] font-black uppercase tracking-[0.4em] text-emerald-400/40 mb-2">Optimization Vector</p>
+                 <p className="text-xl font-black italic tracking-tighter text-emerald-400">
+                   {coachInsights.data?.suggestion 
+                     ? `+${coachInsights.data.suggestion.amount}${coachInsights.data.suggestion.unit} ${coachInsights.data.suggestion.type.toUpperCase()}`
+                     : "NEUTRAL BALANCE"}
+                 </p>
+              </div>
+            )}
           </div>
+        </div>
+      </motion.div>
+
+
+      {/* MACRO HUD: Precision Nutrition HUD */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        {[
+          { label: "Caloric Intake", value: calCurrent.toLocaleString(), sub: `Target ${calTarget.toLocaleString()}`, icon: <Flame size={20}/>, pct: calPct, color: "from-emerald-400 to-emerald-600", glow: "shadow-emerald-500/20" },
+          { label: "Protein Availability", value: `${proteinCurrent}g`, sub: `Limit ${proteinTarget}g`, icon: <Zap size={20}/>, pct: proteinPct, color: "from-blue-400 to-blue-600", glow: "shadow-blue-500/20" },
+          { label: "Protocol Compliance", value: `${Math.round(calPct)}%`, sub: "Metabolic Alignment", icon: <Target size={20}/>, pct: calPct, color: "from-amber-400 to-amber-600", glow: "shadow-amber-500/20" },
+          { label: "Nutritional Velocity", value: mealCount > 0 ? "High" : "Standby", sub: `${mealCount} Entries Logged`, icon: <TrendingUp size={20}/>, pct: Math.min(100, (mealCount / 4) * 100), color: "from-white/20 to-white/5", glow: "" },
+        ].map((stat, i) => (
+          <GlassTilt key={i} intensity={10}>
+            <motion.div 
+              whileHover={{ y: -4 }}
+              className="p-10 border border-white/5 bg-white/[0.02] backdrop-blur-3xl hover:bg-white/[0.05] transition-all group rounded-[3rem] relative overflow-hidden"
+            >
+              <div className="flex justify-between items-start mb-10">
+                <span className="text-[9px] tracking-[0.4em] text-white/20 uppercase font-black" style={{ fontFamily: 'var(--font-label)' }}>{stat.label}</span>
+                <div className="p-3 border border-white/5 group-hover:border-white/20 transition-colors rounded-2xl text-white/30 group-hover:text-white">
+                  {stat.icon}
+                </div>
+              </div>
+              <div className="flex flex-col mb-10">
+                <span className="text-5xl font-black italic tracking-tighter text-liquid mb-2" style={{ fontFamily: 'var(--font-display)' }}>{stat.value}</span>
+                <span className="text-[9px] text-white/10 font-black uppercase tracking-[0.3em] font-bold">{stat.sub}</span>
+              </div>
+              <div className="h-[4px] w-full bg-white/5 overflow-hidden rounded-full">
+                <motion.div 
+                  initial={{ width: 0 }} 
+                  animate={{ width: `${stat.pct}%` }} 
+                  transition={{ duration: 2.5, delay: i * 0.15, ease: [0.2, 0.8, 0.2, 1] }} 
+                  className={`h-full bg-gradient-to-r ${stat.color} ${stat.glow} shadow-2xl transition-all`} 
+                />
+              </div>
+            </motion.div>
+          </GlassTilt>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 border border-white/5 p-8 bg-white/[0.01] rounded-[2.5rem] relative overflow-hidden">
-          <div className="flex justify-between items-center mb-10 relative z-10">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {/* BIOMETRIC ANALYTICS */}
+        <div className="lg:col-span-12 border border-white/5 p-12 bg-white/[0.01] rounded-[4rem] relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+            <LayoutDashboard size={300} strokeWidth={0.5} />
+          </div>
+          
+          <div className="flex justify-between items-start mb-16 relative z-10">
             <div>
-              <h3 className="text-2xl font-black italic tracking-tighter text-white" style={{ fontFamily: 'var(--font-display)' }}>Biometric Analytics</h3>
-              <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.3em] mt-1">Caloric Intensity Spectrum</p>
+              <h3 className="text-3xl font-black italic tracking-tighter text-white leading-none" style={{ fontFamily: 'var(--font-display)' }}>Biometric Analytics</h3>
+              <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.4em] mt-4">Metabolic Flux Spectrum</p>
             </div>
-            <div className="flex gap-2">
-               <div className="flex items-center gap-2 px-3 py-1.5 border border-white/5 bg-white/[0.02] rounded-lg">
-                 <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                 <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Target Intensity</span>
+            <div className="flex gap-4">
+               <div className="flex items-center gap-3 px-6 py-2.5 border border-white/5 bg-white/[0.02] rounded-2xl">
+                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Efficiency Vector</span>
                </div>
             </div>
           </div>
-          <div className="h-[350px] w-full relative z-10">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={yesterdayData}>
-                <defs>
-                  <linearGradient id="colorCal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff03" vertical={false} />
-                <XAxis dataKey="name" stroke="none" tick={{ fill: '#4a665a', fontSize: 10, fontWeight: 700 }} />
-                <YAxis stroke="none" tick={{ fill: '#4a665a', fontSize: 10, fontWeight: 700 }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#031810', border: '1px solid #10b98120', borderRadius: '16px', backdropFilter: 'blur(20px)' }}
-                  itemStyle={{ color: '#10b981', fontSize: '12px', fontWeight: 900, textTransform: 'uppercase' }}
-                  labelStyle={{ color: '#ffffff40', fontSize: '10px', marginBottom: '4px' }}
-                />
-                <Area type="monotone" dataKey="calories" stroke="#10b981" fillOpacity={1} fill="url(#colorCal)" strokeWidth={4} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="border border-white/5 p-8 bg-white/[0.01] rounded-[2.5rem] flex flex-col">
-          <div className="flex justify-between items-center mb-10">
-            <h3 className="text-2xl font-black italic tracking-tighter text-white" style={{ fontFamily: 'var(--font-display)' }}>Intelligence Feed</h3>
-            <button onClick={onAddMeal} className="p-3 bg-emerald-500 text-white hover:bg-emerald-400 transition-all rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)]">
-              <Plus size={18} strokeWidth={3}/>
-            </button>
-          </div>
           
-          <div className="flex-1 space-y-8 overflow-y-auto pr-2 custom-scrollbar">
-            {/* Today's Section */}
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 mb-4 ml-1">Today's Intake</p>
-              {todayMeals.length === 0 ? (
-                <div className="p-6 border border-dashed border-white/10 rounded-2xl text-center">
-                  <p className="text-xs text-white/20 font-bold italic">No data logged for current cycle</p>
+          <div className="h-[400px] w-full relative z-10">
+            {!yesterdayData || yesterdayData.length === 0 ? (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+                <div className="w-48 h-[1px] bg-white/5 relative overflow-hidden">
+                  <motion.div 
+                    animate={{ x: ["-100%", "100%"] }} 
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 bg-emerald-400/20"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {todayMeals.map((meal: any) => (
-                    <div key={meal.id} className="group">
-                      <div className="flex-1 border border-white/5 p-4 flex justify-between items-center bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all rounded-2xl relative overflow-hidden gap-4">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/20" />
-                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                          {meal.imageUrl && (
-                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 shrink-0">
-                               <img src={meal.imageUrl} alt="" className="w-full h-full object-cover" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                               <p className="text-xs font-black italic tracking-tighter uppercase truncate">{meal.mealType}</p>
-                               <span className="text-[9px] text-white/20 font-bold">{new Date(meal.loggedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}</span>
-                               {meal.imageUrl && <Zap size={10} className="text-emerald-400/60" />}
-                            </div>
-                            <p className="text-[10px] text-white/40 mt-1 font-bold truncate">{meal.notes || (meal.imageUrl ? "AI Visual Entry" : "Standard Protocol")}</p>
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <p className={`text-sm font-black italic tracking-tighter ${getAlignmentColor(meal)}`}>{meal.totals?.calories || 0} kcal</p>
-                          <div className="w-1.5 h-1.5 rounded-full bg-current ml-auto mt-1 opacity-20" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* History Section */}
-            {historyMeals.length > 0 && (
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 mb-4 ml-1">Historical Feed</p>
-                <div className="space-y-3 opacity-60 hover:opacity-100 transition-opacity">
-                  {historyMeals.slice(0, 5).map((meal: any) => (
-                    <div key={meal.id} className="flex justify-between items-center border border-white/5 p-4 bg-white/[0.01] rounded-2xl">
-                       <div>
-                         <p className="text-[11px] font-black italic tracking-tight uppercase opacity-50">{meal.mealType}</p>
-                         <p className="text-[9px] text-white/20 font-bold">{new Date(meal.loggedAt).toLocaleDateString("en", { month: 'short', day: 'numeric' })}</p>
-                       </div>
-                       <p className={`text-xs font-black italic tracking-tighter ${getAlignmentColor(meal)}`}>{meal.totals?.calories || 0} kcal</p>
-                    </div>
-                  ))}
-                </div>
+                <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">Awaiting Biometric Data Stream...</span>
               </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={yesterdayData}>
+                  <defs>
+                    <linearGradient id="colorCal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="12 12" stroke="#ffffff03" vertical={false} />
+                  <XAxis dataKey="name" stroke="none" tick={{ fill: '#ffffff15', fontSize: 10, fontWeight: 900 }} dy={20} />
+                  <YAxis stroke="none" tick={{ fill: '#ffffff15', fontSize: 10, fontWeight: 900 }} dx={-20} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#050505', border: '1px solid #ffffff10', borderRadius: '24px', backdropFilter: 'blur(40px)', padding: '20px' }}
+                    itemStyle={{ color: '#10b981', fontSize: '13px', fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.02em' }}
+                    labelStyle={{ color: '#ffffff30', fontSize: '10px', fontWeight: 900, letterSpacing: '0.2em', marginBottom: '8px' }}
+                    cursor={{ stroke: '#ffffff10', strokeWidth: 2 }}
+                  />
+
+                  <Area type="monotone" dataKey="calories" stroke="#10b981" fillOpacity={1} fill="url(#colorCal)" strokeWidth={5} animationDuration={3000} />
+                </AreaChart>
+              </ResponsiveContainer>
             )}
           </div>
         </div>
@@ -506,59 +573,196 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
 }
 
 
-function DietPlanTab({ profile, goalLabel }: any) {
+
+function DietPlanTab({ profile, goalLabel, activeProtocols, todayMeals, yesterdayMeals, historyMeals, onAddMeal, calCurrent, calTarget, proteinCurrent, proteinTarget }: any) {
+  const currentProtocol = activeProtocols?.[0];
+  
   const targets = [
-    { label: "Calories", value: profile?.dailyCalorieTarget || 2000, color: "from-orange-500/20 to-orange-500/5", ring: "border-orange-500/40", unit: "kcal" },
-    { label: "Protein", value: profile?.dailyProteinTargetG || 150, color: "from-blue-500/20 to-blue-500/5", ring: "border-blue-500/40", unit: "g" },
-    { label: "Carbs", value: profile?.dailyCarbsTargetG || 200, color: "from-green-500/20 to-green-500/5", ring: "border-green-500/40", unit: "g" },
-    { label: "Fats", value: profile?.dailyFatTargetG || 70, color: "from-yellow-500/20 to-yellow-500/5", ring: "border-yellow-500/40", unit: "g" },
+    { label: "Energy Threshold", value: currentProtocol?.targetCalories || profile?.dailyCalorieTarget || 2000, color: "from-emerald-500/10 to-transparent", ring: "border-emerald-500/20", unit: "kcal", icon: <Flame size={16}/> },
+    { label: "Essential Protein", value: currentProtocol?.targetProteinG || profile?.dailyProteinTargetG || 150, color: "from-blue-500/10 to-transparent", ring: "border-blue-500/20", unit: "g", icon: <Zap size={16}/> },
+    { label: "Complex Carbs", value: currentProtocol?.targetCarbsG || profile?.dailyCarbsTargetG || 200, color: "from-amber-500/10 to-transparent", ring: "border-amber-500/20", unit: "g", icon: <Activity size={16}/> },
+    { label: "Balanced Lipids", value: currentProtocol?.targetFatG || profile?.dailyFatTargetG || 70, color: "from-rose-500/10 to-transparent", ring: "border-rose-500/20", unit: "g", icon: <Target size={16}/> },
   ];
 
   const suggestions = getSuggestions(profile?.goalType, profile?.dietPreference, 8);
 
+  const calPct = Math.min(100, Math.round((calCurrent / calTarget) * 100));
+
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
-      <header>
-        <h2 className="text-4xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)' }}>Nutritional Protocol</h2>
-        <p className="text-white/30 text-sm">Optimized for {goalLabel(profile?.goalType)} · {profile?.dietPreference?.toUpperCase()}</p>
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.98 }} 
+      animate={{ opacity: 1, scale: 1 }} 
+      exit={{ opacity: 0, scale: 0.98 }} 
+      className="space-y-16"
+    >
+      <header className="flex justify-between items-end">
+        <div>
+          <h2 className="text-6xl font-black italic tracking-tighter mb-4" style={{ fontFamily: 'var(--font-display)' }}>Nutritional Mandate</h2>
+          <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.4em]">Current Strategy: {currentProtocol ? currentProtocol.title : goalLabel(profile?.goalType)} · {profile?.dietPreference?.toUpperCase()}</p>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {targets.map((t, i) => (
-          <div key={i} className={`p-8 bg-gradient-to-br ${t.color} border border-white/5 rounded-[2rem] relative group`}>
-            <p className="text-xs uppercase font-black tracking-[0.2em] text-white/40 mb-4">{t.label}</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-black italic tracking-tighter leading-none">{t.value}</span>
-              <span className="text-lg font-bold text-white/20 italic">{t.unit}</span>
-            </div>
-            <div className={`absolute top-8 right-8 w-12 h-12 border-2 ${t.ring} rounded-full flex items-center justify-center opacity-20 group-hover:opacity-100 transition-opacity`}>
-              <div className="w-6 h-1 bg-white/60 rounded-full" />
-            </div>
+      {/* NEURAL HUD: Circular Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-8 space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {targets.map((t, i) => (
+              <motion.div 
+                key={i} 
+                whileHover={{ y: -8 }}
+                className={`p-10 bg-white/[0.01] border border-white/5 hover:border-white/10 rounded-[3rem] relative group overflow-hidden transition-all`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${t.color} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
+                <div className="relative z-10">
+                  <div className="flex justify-between items-center mb-10">
+                    <p className="text-[9px] uppercase font-black tracking-[0.4em] text-white/20 group-hover:text-white/40 transition-colors">{t.label}</p>
+                    <div className="text-white/20 group-hover:text-white/60 transition-colors">{t.icon}</div>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-black italic tracking-tighter leading-none text-white">{t.value}</span>
+                    <span className="text-[10px] font-black text-white/10 uppercase tracking-widest">{t.unit}</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div className="border border-white/5 bg-white/[0.01] p-10 rounded-[3rem]">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="p-3 bg-white text-black rounded-2xl"><Target size={24}/></div>
-          <div>
-            <h3 className="text-2xl font-bold tracking-tight">Goal Alignment</h3>
-            <p className="text-white/20 text-sm">Current protocol efficiency: <span className="text-white/60 font-bold">94.2%</span></p>
+          <div className="p-[1px] bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-[3.5rem] shadow-2xl relative group overflow-hidden">
+            <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="bg-[#080808] p-12 lg:p-16 rounded-[3.5rem] relative z-10">
+              <div className="flex items-center gap-8 mb-10">
+                <div className="p-5 bg-white/[0.03] border border-white/5 text-emerald-400 rounded-3xl shadow-2xl"><Target size={32} strokeWidth={1.5}/></div>
+                <div>
+                  <h3 className="text-3xl font-black italic tracking-tighter">Strategic Alignment</h3>
+                  <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.3em] mt-2">Protocol Efficiency: <span className="text-emerald-400">94.2% Accurate</span></p>
+                </div>
+              </div>
+              <p className="max-w-4xl text-2xl text-white/40 leading-tight font-medium italic tracking-tight">
+                "Your physiological profile indicates a shift towards <span className="text-white">optimized metabolic flexibility</span>. By prioritizing <span className="text-white">bioavailable amino acids</span> and maintaining a surgical <span className="text-white">carbohydrate cycle</span>, we are locking into a verified metabolic state aligned with the <span className="text-emerald-400">{goalLabel(profile?.goalType)}</span> directive."
+              </p>
+            </div>
           </div>
         </div>
-        <p className="max-w-3xl text-lg text-white/50 leading-relaxed font-medium italic">
-          "Based on your preference for a <span className="text-white/90">{profile?.dietPreference}</span> diet and goal of <span className="text-white/90">{goalLabel(profile?.goalType)}</span>, our engine has prioritized high-bioavailable proteins and complex fiber sources while maintaining a controlled caloric deficit relative to your TDEE."
-        </p>
+
+        {/* METABOLIC TIMELINE */}
+        <div className="lg:col-span-4 border border-white/5 p-12 bg-white/[0.01] rounded-[4rem] flex flex-col relative overflow-hidden h-[700px]">
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+            <Activity size={300} strokeWidth={0.5} />
+          </div>
+          
+          <div className="mb-12 relative z-10 text-center">
+             <div className="relative inline-block w-40 h-40 mb-8">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle cx="80" cy="80" r="70" fill="transparent" stroke="#ffffff08" strokeWidth="8" />
+                  <motion.circle 
+                    cx="80" cy="80" r="70" fill="transparent" stroke="#10b981" strokeWidth="8" 
+                    strokeDasharray={440} 
+                    initial={{ strokeDashoffset: 440 }}
+                    animate={{ strokeDashoffset: 440 - (440 * calPct) / 100 }}
+                    transition={{ duration: 2, ease: "easeOut" }}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                   <p className="text-3xl font-black italic tracking-tighter text-white leading-none">{calPct}%</p>
+                   <p className="text-[8px] text-white/20 font-black uppercase tracking-widest mt-1">Metabolic CAP</p>
+                </div>
+             </div>
+             <h3 className="text-2xl font-black italic tracking-tighter text-white">Metabolic Timeline</h3>
+             <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.4em] mt-2">Active Intake Stream</p>
+          </div>
+
+          <div className="flex-1 space-y-10 overflow-y-auto overscroll-contain pr-2 custom-scrollbar relative z-10 px-2">
+            {todayMeals.length === 0 ? (
+                <div className="p-10 border border-dashed border-white/5 rounded-[2.5rem] text-center bg-white/[0.01]">
+                  <p className="text-xs text-white/10 font-black italic tracking-tight uppercase">Ready for Input</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                  {todayMeals.map((meal: any) => (
+                    <motion.div 
+                      key={meal.id} 
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="group p-6 border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all rounded-[2rem] flex justify-between items-center"
+                    >
+                      <div className="flex items-center gap-5 min-w-0">
+                        <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/20 transition-all">
+                           <Utensils size={18} className="text-emerald-400" />
+                        </div>
+                        <div className="min-w-0">
+                           <p className="text-[12px] font-black italic tracking-tight uppercase truncate text-white/90">{meal.mealType}</p>
+                           <p className="text-[9px] text-white/20 font-bold tracking-widest uppercase">{new Date(meal.loggedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })}</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-black italic tracking-tighter text-emerald-400">{meal.totals?.calories || 0} kcal</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+            )}
+
+            {yesterdayMeals.length > 0 && (
+              <div className="space-y-6 pt-6 border-t border-white/5">
+                <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20">Historical Delta</p>
+                <div className="space-y-4">
+                   {yesterdayMeals.slice(0, 3).map((meal: any) => (
+                      <div key={meal.id} className="flex justify-between items-center grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all">
+                         <p className="text-[11px] font-black italic text-white/60 uppercase">{meal.mealType}</p>
+                         <p className="text-[11px] font-black italic text-white/20">{meal.totals?.calories} kcal</p>
+                      </div>
+                   ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div>
-        <h3 className="text-xl font-bold mb-6 flex items-center gap-3"><Sparkles className="text-white/30" /> Recommended Foundations</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="pt-12">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.6em] text-white/20 mb-12 flex items-center gap-8">
+          System Foundations <div className="h-[1px] flex-1 bg-gradient-to-r from-white/5 to-transparent" />
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-6">
           {suggestions.map((f, i) => (
-            <div key={i} className="p-5 border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all rounded-2xl">
-              <p className="font-bold text-sm mb-1">{f.foodName}</p>
-              <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest">{f.category} · {f.calories} kcal</p>
-            </div>
+            <motion.div 
+              key={i} 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              whileHover={{ scale: 1.05, y: -8 }}
+              onClick={() => onAddMeal(f)}
+              className="relative aspect-[4/5] overflow-hidden rounded-[2.5rem] border border-white/5 group bg-[#080808] cursor-pointer shadow-2xl transition-all hover:border-emerald-500/20"
+            >
+              {f.image ? (
+                <div className="absolute inset-0 z-0">
+                  <img 
+                    src={f.image} 
+                    alt={f.foodName}
+                    className="w-full h-full object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-125 opacity-40 group-hover:opacity-80"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/20 to-transparent opacity-90 group-hover:opacity-60 transition-opacity duration-700" />
+                </div>
+              ) : (
+                <div className="absolute inset-0 bg-white/[0.01]" />
+              )}
+              
+              <div className="absolute inset-0 z-10 p-6 lg:p-8 flex flex-col justify-end">
+                <div className="space-y-1 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+                  <p className="font-black italic tracking-tighter text-[13px] leading-tight group-hover:text-emerald-400 transition-colors uppercase">{f.foodName}</p>
+                  <div className="flex justify-between items-center opacity-0 group-hover:opacity-100 transition-all duration-500 delay-100">
+                    <p className="text-[9px] text-white/40 font-bold uppercase tracking-[0.2em]">{f.calories} kcal</p>
+                    <div className="p-2.5 bg-emerald-500 text-black rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)]">
+                      <Plus size={12} strokeWidth={4} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Neural Aura */}
+              <div className="absolute inset-0 border-2 border-emerald-500/0 group-hover:border-emerald-500/20 rounded-[2.5rem] transition-all duration-700" />
+            </motion.div>
           ))}
         </div>
       </div>
@@ -576,83 +780,106 @@ function ProgressTab({ weightHistory, adherenceStats, onLogWeight }: any) {
   const currentWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weightKg : "--";
 
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-16">
       <header className="flex justify-between items-end">
         <div>
-          <h2 className="text-4xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)' }}>Biometric Evolution</h2>
-          <p className="text-white/30 text-sm">Tracking day-to-day physiological shifts</p>
+          <h2 className="text-6xl font-black italic tracking-tighter mb-4" style={{ fontFamily: 'var(--font-display)' }}>Health Metrics Tracking</h2>
+          <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.4em]">Biometric Variance · Physiological Delta</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 p-2 bg-white/[0.02] border border-white/5 rounded-3xl backdrop-blur-md">
           <input 
             type="number" 
-            placeholder="Today's kg..." 
+            placeholder="Mass (kg)" 
             value={newWeight}
             onChange={(e) => setNewWeight(e.target.value)}
-            className="w-32 bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-white/30 outline-none"
+            className="w-32 bg-transparent px-6 py-4 text-sm font-black italic text-white outline-none placeholder:text-white/10"
           />
           <button 
             onClick={() => { if(newWeight) onLogWeight(parseFloat(newWeight)); setNewWeight(""); }}
-            className="px-6 py-3 bg-white text-black font-bold text-sm rounded-xl hover:bg-white/80 transition-all"
-          >Log Entry</button>
+            className="px-8 py-4 bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-emerald-400 transition-all shadow-xl"
+          >Sync Entry</button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 border border-white/5 p-8 bg-white/[0.01] rounded-[2rem]">
-          <div className="flex justify-between items-center mb-10">
-            <h3 className="text-xl font-bold uppercase tracking-widest text-white/40 text-xs">Mass Distribution</h3>
-            <span className="text-sm font-bold italic">Current Index: {currentWeight} kg</span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-8 border border-white/5 p-12 bg-white/[0.01] rounded-[4rem] relative overflow-hidden">
+          <div className="flex justify-between items-center mb-16 relative z-10">
+            <div>
+              <h3 className="text-2xl font-black italic tracking-tighter uppercase text-white/40">Body Weight Analysis</h3>
+              <p className="text-[9px] text-emerald-400/60 font-black uppercase tracking-[0.3em] mt-2">Current Physiological State: {currentWeight} kg</p>
+            </div>
           </div>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff03" vertical={false} />
-                <XAxis dataKey="date" stroke="none" tick={{ fill: '#4a665a', fontSize: 10, fontWeight: 700 }} />
-                <YAxis domain={['dataMin - 2', 'dataMax + 2']} stroke="none" tick={{ fill: '#4a665a', fontSize: 10, fontWeight: 700 }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#031810', border: '1px solid #10b98120', borderRadius: '16px', backdropFilter: 'blur(20px)' }}
-                  itemStyle={{ color: '#10b981', fontSize: '12px', fontWeight: 900 }}
-                />
-                <Area type="step" dataKey="weight" stroke="#10b981" strokeWidth={3} fill="url(#colorWeight)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-[400px] relative z-10">
+            {!chartData || chartData.length === 0 ? (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+                <div className="w-48 h-[1px] bg-white/5 relative overflow-hidden">
+                  <motion.div 
+                    animate={{ x: ["-100%", "100%"] }} 
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 bg-emerald-400/20"
+                  />
+                </div>
+                <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">Awaiting Biometric Data Stream...</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="12 12" stroke="#ffffff03" vertical={false} />
+                  <XAxis dataKey="date" stroke="none" tick={{ fill: '#ffffff15', fontSize: 10, fontWeight: 900 }} dy={20} />
+                  <YAxis domain={['dataMin - 2', 'dataMax + 2']} stroke="none" tick={{ fill: '#ffffff15', fontSize: 10, fontWeight: 900 }} dx={-20} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#050505', border: '1px solid #ffffff10', borderRadius: '24px', backdropFilter: 'blur(40px)', padding: '20px' }}
+                    itemStyle={{ color: '#10b981', fontSize: '12px', fontWeight: 900, textTransform: 'uppercase' }}
+                  />
+                  <Area type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={5} fill="url(#colorWeight)" animationDuration={3000} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
-
         </div>
 
-        <div className="space-y-6">
-          <div className="p-8 border border-white/5 bg-white/[0.01] rounded-[2rem]">
-            <h4 className="text-xs font-black uppercase tracking-[0.3em] text-white/20 mb-6">Weekly Adherence</h4>
-            <div className="flex justify-between gap-1">
-              {[1, 2, 3, 4, 5, 6, 7].map(d => {
-                const day = adherenceStats?.recentAdherence?.find((a: any) => new Date(a.date).getDay() === (d % 7));
+        <div className="lg:col-span-4 space-y-8">
+          <div className="p-10 border border-white/5 bg-white/[0.01] rounded-[3rem] relative overflow-hidden group">
+            <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />
+            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-8 relative z-10">Cycle Consistency</h4>
+            <div className="flex justify-between gap-1 relative z-10">
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => {
+                const day = adherenceStats?.recentAdherence?.find((a: any) => new Date(a.date).getDay() === ((i + 1) % 7));
                 return (
-                  <div key={d} className={`flex-1 h-12 rounded-lg border border-white/5 flex items-center justify-center ${day?.status === 'on_track' ? 'bg-white/20' : 'bg-white/[0.02]'}`}>
-                    {day?.status === 'on_track' && <Sparkles size={12} className="text-white/60"/>}
+                  <div key={i} className="flex flex-col items-center gap-3 flex-1">
+                    <div className={`w-full h-16 rounded-xl border transition-all duration-700 flex items-center justify-center ${day?.status === 'on_track' ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-20'}`}>
+                      {day?.status === 'on_track' && <Sparkles size={16} className="text-emerald-400 rotate-12"/>}
+                    </div>
+                    <span className="text-[9px] font-black text-white/10 uppercase">{d}</span>
                   </div>
                 );
               })}
             </div>
-            <p className="mt-4 text-[10px] text-center font-bold text-white/20 tracking-widest uppercase">Operational Consistency</p>
+            <p className="mt-8 text-[9px] text-center font-black text-white/10 tracking-[0.4em] uppercase">Metabolic Uptime: Active</p>
           </div>
 
-          <div className="p-8 border border-white/5 bg-gradient-to-br from-white/[0.05] to-transparent rounded-[2rem]">
-            <Trophy size={32} className="text-white/20 mb-4" />
-            <h4 className="text-xl font-black italic tracking-tighter mb-2">Weekly Badges</h4>
-            <div className="flex gap-2">
+          <div className="p-10 border border-white/5 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-[3rem] relative group shadow-2xl">
+            <Trophy size={40} className="text-emerald-400 mb-6" />
+            <h4 className="text-2xl font-black italic tracking-tighter text-white mb-2">Protocol Badges</h4>
+            <p className="text-[10px] text-white/30 font-bold uppercase tracking-[0.2em] mb-8">Weekly Distinction Earned</p>
+            <div className="flex flex-wrap gap-3">
               {Array.from({ length: adherenceStats?.weeklyAwardCount || 0 }).map((_, i) => (
-                 <div key={i} className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
-                    <Zap size={16} className="text-black" />
-                 </div>
+                 <motion.div 
+                   key={i} 
+                   whileHover={{ rotate: 15 }}
+                   className="w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center shadow-xl border border-white/20"
+                 >
+                    <Zap size={20} fill="currentColor" />
+                 </motion.div>
               ))}
-              <div className="w-10 h-10 rounded-full border border-dashed border-white/20 flex items-center justify-center">
-                 <Plus size={12} className="text-white/10" />
+              <div className="w-14 h-14 rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center opacity-40">
+                 <Plus size={16} className="text-white" />
               </div>
             </div>
           </div>
@@ -669,53 +896,68 @@ function AwardsTab({ adherenceStats, isUnlocked, profile }: any) {
   const cheatOptions = getCheatSuggestions(3);
 
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-12">
-      <header className="text-center max-w-2xl mx-auto space-y-4">
-        <h2 className="text-6xl font-black italic tracking-tighter" style={{ fontFamily: 'var(--font-display)' }}>Milestone Protocol</h2>
-        <p className="text-white/40 text-lg font-medium leading-relaxed">Your consistency translates directly into procedural rewards. Accumulate points monthly to unlock high-utility 'cheat' day parameters.</p>
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.98 }} 
+      animate={{ opacity: 1, scale: 1 }} 
+      exit={{ opacity: 0, scale: 0.98 }} 
+      className="space-y-16"
+    >
+      <header className="text-center max-w-3xl mx-auto space-y-6">
+        <h2 className="text-7xl font-black italic tracking-tighter" style={{ fontFamily: 'var(--font-display)' }}>Achievement Calibration</h2>
+        <p className="text-white/40 text-lg font-medium leading-relaxed italic">Consistency in your nutritional mandate unlocks strategic dietary flexibility. Maintain high-fidelity adherence to access verified bypass rewards.</p>
       </header>
 
-      <div className="max-w-4xl mx-auto p-16 border border-white/10 bg-white/[0.01] rounded-[4rem] relative overflow-hidden text-center">
+      <div className="max-w-5xl mx-auto p-20 border border-white/5 bg-white/[0.01] rounded-[5rem] relative overflow-hidden text-center shadow-[0_50px_100px_rgba(0,0,0,0.5)]">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 blur-[150px] rounded-full" />
         <div className="relative z-10">
-          <p className="text-xs font-black uppercase tracking-[0.5em] text-white/30 mb-8">Monthly Progress Cycle</p>
-          <div className="inline-flex items-baseline gap-4 mb-10">
-            <span className="text-9xl font-black tracking-tighter tabular-nums">{points}</span>
-            <span className="text-2xl font-bold text-white/20 italic">/ {monthlyGoal} PTS</span>
+          <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/20 mb-10">Monthly Synchronization Cycle</p>
+          <div className="inline-flex items-baseline gap-6 mb-12">
+            <span className="text-[12rem] font-black tracking-tighter leading-none tabular-nums text-white">{points}</span>
+            <span className="text-3xl font-black text-white/10 italic">/ {monthlyGoal} Pts</span>
           </div>
-          <div className="h-4 w-full bg-white/5 rounded-full overflow-hidden mb-12 border border-white/10">
-            <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 2, ease: "circOut" }} className="h-full bg-white shadow-[0_0_40px_rgba(255,255,255,0.4)]" />
+          <div className="h-6 w-full bg-white/[0.02] rounded-full overflow-hidden mb-16 border border-white/5 p-1.5 shadow-inner">
+            <motion.div 
+              initial={{ width: 0 }} 
+              animate={{ width: `${pct}%` }} 
+              transition={{ duration: 2.5, ease: "circOut" }} 
+              className="h-full bg-white rounded-full shadow-[0_0_50px_rgba(255,255,255,0.4)] relative"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-white opacity-40" />
+            </motion.div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className={`p-10 border rounded-[3rem] transition-all duration-700 ${isUnlocked ? 'border-white bg-white text-black' : 'border-white/5 bg-white/[0.02] opacity-40 grayscale'}`}>
-              <Zap size={40} className={isUnlocked ? 'text-black' : 'text-white/20'} />
-              <h4 className="text-2xl font-black italic tracking-tighter mt-6 mb-2">Cheat Day Protocol</h4>
-              <p className={isUnlocked ? 'text-black/60 font-medium' : 'text-white/20'}>{isUnlocked ? "AUTHORIZED: Relaxed macro constraints enabled for 24 hours." : "LOCKED: Complete 85% of monthly targets to unlock."}</p>
-              {isUnlocked && <button className="mt-8 px-8 py-3 bg-black text-white rounded-full font-bold text-sm">Activate Selection</button>}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className={`p-12 border rounded-[3.5rem] transition-all duration-1000 relative group overflow-hidden ${isUnlocked ? 'border-white bg-white text-black' : 'border-white/5 bg-white/[0.02] grayscale opacity-40'}`}
+            >
+              <Zap size={56} strokeWidth={1.5} className={isUnlocked ? 'text-black' : 'text-white/10'} />
+              <h4 className="text-4xl font-black italic tracking-tighter mt-10 mb-4">Cheat Protocol</h4>
+              <p className={`text-base leading-relaxed ${isUnlocked ? 'text-black/60 font-medium italic' : 'text-white/20'}`}>
+                {isUnlocked ? "SYSTEM AUTHORIZED: Relaxed metabolic constraints enabled for 24-hour cycle. Bio-safety protocols active." : "ACCESS DENIED: Attain 85% volumetric adherence to unlock metabolic bypass."}
+              </p>
+              {isUnlocked && <button className="mt-10 px-12 py-5 bg-black text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl hover:bg-emerald-500 transition-all">Engage Selection</button>}
+            </motion.div>
             
-            <div className={`p-10 border rounded-[3rem] transition-all duration-700 ${points >= 100 ? 'border-white/20 bg-white/5' : 'border-white/5 bg-white/[0.02] opacity-40'}`}>
-              <Utensils size={40} className="text-white/30" />
-              <h4 className="text-2xl font-black italic tracking-tighter mt-6 mb-2">Optimized Cheats</h4>
-              <div className="space-y-3 mt-4">
+            <div className={`p-12 border rounded-[3.5rem] transition-all duration-1000 relative group overflow-hidden ${points >= 100 ? 'border-emerald-500/20 bg-emerald-500/[0.02]' : 'border-white/5 bg-white/[0.01] opacity-40'}`}>
+              <div className="space-y-4">
                 {points >= 100 ? (
                   cheatOptions.map((opt, i) => (
-                    <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
-                      <div className="text-left">
-                        <p className="text-sm font-bold">{opt.foodName}</p>
-                        <p className="text-[10px] text-white/40 uppercase">{opt.calories} kcal · {opt.proteinG}g P</p>
+                    <div key={i} className="flex justify-between items-center bg-white/[0.03] p-5 rounded-3xl border border-white/5 hover:border-emerald-500/30 transition-all group/opt">
+                      <div className="text-left min-w-0">
+                        <p className="text-sm font-black italic text-white/80 group-hover/opt:text-emerald-400 transition-colors uppercase truncate">{opt.foodName}</p>
+                        <p className="text-[10px] text-white/20 font-black uppercase tracking-widest mt-1">{opt.calories} kcal · {opt.proteinG}g P</p>
                       </div>
-                      <Plus size={14} className="text-white/40" />
+                      <Plus size={18} className="text-white/10 group-hover/opt:text-emerald-400" />
                     </div>
                   ))
                 ) : (
-                  <p className="text-white/20 font-medium italic">Accumulate 100 pts to reveal healthy alternatives.</p>
+                  <p className="text-white/20 font-medium italic text-lg py-12">Stabilize 100 pts to reveal high-fidelity nutritional foundation.</p>
                 )}
               </div>
             </div>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-t from-white/[0.02] to-transparent pointer-events-none" />
       </div>
     </motion.div>
   );
@@ -739,25 +981,17 @@ function SettingsTab({ profile, onUpdate }: any) {
   const [saving, setSaving] = useState(false);
 
   const goals = [
-    { id: "lose_weight", label: "Lose Weight" },
-    { id: "gain_muscle", label: "Gain Muscle" },
-    { id: "maintain_weight", label: "Maintain" },
+    { id: "lose_weight", label: "Reduce Mass" },
+    { id: "gain_muscle", label: "Hypertrophy" },
+    { id: "maintain_weight", label: "Equilibrium" },
     { id: "improve_endurance", label: "Endurance" },
-    { id: "general_health", label: "Health" }
-  ];
-
-  const activityLevels = [
-    { value: 'sedentary', label: 'Sedentary (Office job)' },
-    { value: 'lightly_active', label: 'Lightly Active (Exercise 1-3 days/week)' },
-    { value: 'moderately_active', label: 'Moderately Active (Exercise 3-5 days/week)' },
-    { value: 'very_active', label: 'Very Active (Hard exercise 6-7 days/week)' },
-    { value: 'extra_active', label: 'Extra Active (Physical job + hard training)' }
+    { id: "general_health", label: "Vitality" }
   ];
 
   const genders = [
-    { value: 'male', label: 'Male' },
-    { value: 'female', label: 'Female' },
-    { value: 'other', label: 'Other' }
+    { value: 'male', label: 'Biological Male' },
+    { value: 'female', label: 'Biological Female' },
+    { value: 'other', label: 'Bypass Binary' }
   ];
 
   const diets = [
@@ -781,98 +1015,150 @@ function SettingsTab({ profile, onUpdate }: any) {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl space-y-12">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-5xl space-y-20 pb-20">
       <header>
-        <h2 className="text-4xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)' }}>System Architecture</h2>
-        <p className="text-white/30 text-sm">Configure your biological and nutritional parameters</p>
+        <h2 className="text-6xl font-black italic tracking-tighter mb-4" style={{ fontFamily: 'var(--font-display)' }}>System Architecture</h2>
+        <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.4em]">Configuration: Biological & Algorithmic Parameters</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Identifier</label>
-          <input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-white/[0.03] border border-white/5 p-4 rounded-xl focus:border-white/30 outline-none transition-all" />
-        </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Age Parameter</label>
-          <input type="number" value={formData.age} onChange={(e) => setFormData({...formData, age: e.target.value})} className="w-full bg-white/[0.03] border border-white/5 p-4 rounded-xl focus:border-white/30 outline-none transition-all" />
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-16">
+        <div className="space-y-10">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-4 block">Biological Identifier</label>
+            <input 
+              type="text" 
+              value={userName} 
+              onChange={(e) => setUserName(e.target.value)} 
+              className="w-full bg-white/[0.02] border-b border-white/10 p-6 text-2xl font-black italic text-white focus:border-emerald-500 outline-none transition-all placeholder:text-white/5"
+              placeholder="Entity Name"
+            />
+          </div>
 
-        <div className="md:col-span-2 space-y-4">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Primary Objective</label>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-             {goals.map(g => (
-               <button 
-                 key={g.id} 
-                 onClick={() => setFormData({...formData, goalType: g.id})}
-                 className={`py-6 px-2 rounded-2xl border transition-all text-[11px] font-bold uppercase tracking-tighter ${formData.goalType === g.id ? 'bg-white text-black border-white shadow-[0_0_30px_rgba(255,255,255,0.1)]' : 'border-white/5 text-white/40 hover:border-white/20'}`}
-               >{g.label}</button>
-             ))}
+          <div className="grid grid-cols-2 gap-8">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-4 block">Age Cycle</label>
+              <input 
+                type="number" 
+                value={formData.age} 
+                onChange={(e) => setFormData({...formData, age: e.target.value})} 
+                className="w-full bg-white/[0.02] border-b border-white/10 p-6 text-2xl font-black italic text-white focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-4 block">Target Mass (kg)</label>
+              <input 
+                type="number" 
+                value={formData.weightKg} 
+                onChange={(e) => setFormData({...formData, weightKg: e.target.value})} 
+                className="w-full bg-white/[0.02] border-b border-white/10 p-6 text-2xl font-black italic text-white focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+             <label className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-6 block">Gender Protocol</label>
+             <div className="flex flex-wrap gap-3">
+               {genders.map(g => (
+                 <button 
+                  key={g.value}
+                  onClick={() => setFormData({...formData, gender: g.value})}
+                  className={`px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${formData.gender === g.value ? 'bg-white text-black border-white' : 'bg-white/[0.02] border-white/5 text-white/40 hover:border-white/20'}`}
+                 >
+                   {g.label}
+                 </button>
+               ))}
+             </div>
           </div>
         </div>
 
-        <div className="md:col-span-2 space-y-4">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Nutritional Constraint</label>
-          <div className="flex flex-wrap gap-3">
-             {diets.map(d => (
-               <button 
-                 key={d.id} 
-                 onClick={() => setFormData({...formData, dietPreference: d.id})}
-                 className={`py-4 px-8 rounded-full border transition-all text-xs font-bold uppercase ${formData.dietPreference === d.id ? 'bg-white text-black border-white shadow-[0_0_30px_rgba(255,255,255,0.1)]' : 'border-white/5 text-white/40 hover:border-white/20'}`}
-               >{d.label}</button>
-             ))}
+        <div className="space-y-10">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-6 block">Optimization Directive</label>
+            <div className="grid grid-cols-1 gap-3">
+              {goals.map(g => (
+                <button 
+                  key={g.id}
+                  onClick={() => setFormData({...formData, goalType: g.id})}
+                  className={`w-full text-left p-6 rounded-[2rem] border transition-all flex justify-between items-center group ${formData.goalType === g.id ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-white/[0.01] border-white/5 text-white/20 hover:border-white/20'}`}
+                >
+                  <span className="font-black italic tracking-tighter text-xl uppercase">{g.label}</span>
+                  <div className={`w-3 h-3 rounded-full border-2 ${formData.goalType === g.id ? 'bg-emerald-400 border-emerald-400' : 'border-white/10'}`} />
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="md:col-span-2 p-8 border border-white/5 bg-white/[0.01] rounded-[2rem] flex items-center justify-between">
-           <div>
-             <h4 className="text-sm font-black italic tracking-tighter text-white mb-1">Empower AI Coaching</h4>
-             <p className="text-xs text-white/20 font-medium italic">Allow our Intelligence Engine to provide casual, supportive advice based on your daily gaps.</p>
-           </div>
-           <button 
-             onClick={() => setFormData({...formData, coachEnabled: !formData.coachEnabled})}
-             className={`w-16 h-8 rounded-full relative transition-all ${formData.coachEnabled ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-white/10'}`}
-           >
-             <motion.div 
-               animate={{ x: formData.coachEnabled ? 32 : 4 }}
-               className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg" 
-             />
-           </button>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-6 block">Nutritional Framework</label>
+            <div className="flex flex-wrap gap-3">
+              {diets.map(d => (
+                <button 
+                  key={d.id}
+                  onClick={() => setFormData({...formData, dietPreference: d.id})}
+                  className={`px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${formData.dietPreference === d.id ? 'bg-white text-black border-white' : 'bg-white/[0.02] border-white/5 text-white/40 hover:border-white/20'}`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-
-      <div className="pt-10 flex justify-end">
+      <div className="flex items-center justify-between pt-16 border-t border-white/5">
+        <div className="flex items-center gap-6">
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl"><Activity size={24}/></div>
+          <div>
+            <p className="font-black italic text-white text-lg">AI Coach Synchronization</p>
+            <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.2em] mt-1">Real-time physiological auditing active</p>
+          </div>
+        </div>
         <button 
           onClick={handleSave}
           disabled={saving}
-          className="px-12 py-5 bg-white text-black font-black italic tracking-tighter rounded-full hover:scale-105 transition-all disabled:opacity-50 shadow-[0_0_50px_rgba(255,255,255,0.2)]"
-        >{saving ? "SYNCING..." : "COMMIT CHANGES"}</button>
+          className="px-16 py-6 bg-white text-black font-black uppercase tracking-[0.3em] text-xs rounded-[2.5rem] hover:bg-emerald-500 hover:text-white transition-all shadow-[0_20px_50px_rgba(0,0,0,0.3)] disabled:opacity-50"
+        >
+          {saving ? "Synchronizing..." : "Initialize Update"}
+        </button>
       </div>
     </motion.div>
   );
 }
 
 function AddMealModal({ 
-  onClose, onSuccess, profile 
+  onClose, onSuccess, profile, pendingItem, inline = false
 }: { 
   onClose: () => void; 
   onSuccess: () => void;
   profile: Profile | null;
+  pendingItem: any | null;
+  inline?: boolean;
 }) {
+  useEffect(() => {
+    if (!inline) document.body.style.overflow = "hidden";
+    if (pendingItem) {
+       addItem({
+         ...pendingItem,
+         userQuantity: pendingItem.servingSize,
+         userUnit: pendingItem.servingUnit
+       });
+       setIsAiMode(false);
+    }
+    return () => {
+      if (!inline) document.body.style.overflow = "unset";
+    };
+  }, [pendingItem, inline]);
+
   const [mealType, setMealType] = useState<string>("breakfast");
-  const [items, setItems] = useState<FoodSuggestion[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-
   const [aiInput, setAiInput] = useState("");
   const [isAiMode, setIsAiMode] = useState(true);
-  const [visionMode, setVisionMode] = useState(false); // New: Image vs Text AI
-  const [visionFile, setVisionFile] = useState<File | null>(null);
-  const [visionImageUrl, setVisionImageUrl] = useState<string | null>(null);
   const [isInterpreting, setIsInterpreting] = useState(false);
 
   const handleAiInterpret = async () => {
@@ -884,13 +1170,15 @@ function AddMealModal({
       if (res.data && res.data.length > 0) {
         const newItems = res.data.map((f: any) => ({
           foodName: f.label,
-          servingSize: f.servingSize,
-          servingUnit: f.servingUnit,
+          servingSize: f.servingSize || 100,
+          servingUnit: f.servingUnit || "g",
           calories: f.calories,
           proteinG: f.protein,
           carbsG: f.carbs,
           fatG: f.fat,
-          fiberG: f.fiber,
+          fiberG: f.fiber || 0,
+          userQuantity: f.servingSize || 100,
+          userUnit: f.servingUnit || "g",
           category: "snack" as const
         }));
 
@@ -899,27 +1187,32 @@ function AddMealModal({
         setIsAiMode(false);
       }
     } catch (err: any) {
-      setError(err.message || "Could not interpret meal description");
+      setError(err.message || "Neural engine encountered a bottleneck. Try a simpler prompt.");
     } finally {
       setIsInterpreting(false);
     }
   };
 
   const addItem = (food: FoodSuggestion) => {
-
-    setItems(prev => [...prev, food]);
+    setItems(prev => [...prev, { 
+      ...food, 
+      userQuantity: food.servingSize, 
+      userUnit: food.servingUnit 
+    }]);
   };
 
   const addItemFromSearch = (food: any) => {
     setItems(prev => [...prev, {
       foodName: food.label,
-      servingSize: 100, // Default to 100g 
+      servingSize: 100,
       servingUnit: "g",
       calories: Math.round(food.calories),
       proteinG: Math.round(food.protein),
       carbsG: Math.round(food.carbs),
       fatG: Math.round(food.fat),
       fiberG: Math.round(food.fiber || 0),
+      userQuantity: 100,
+      userUnit: "g",
       category: "snack"
     }]);
     setSearchTerm("");
@@ -950,234 +1243,199 @@ function AddMealModal({
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
+  const updateItemQty = (index: number, val: number) => {
+    setItems(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], userQuantity: val };
+      return next;
+    });
+  };
 
-  const totalCal = items.reduce((sum, i) => sum + i.calories, 0);
-  const totalProtein = items.reduce((sum, i) => sum + i.proteinG, 0);
+  const updateItemUnit = (index: number, unit: string) => {
+    setItems(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], userUnit: unit };
+      return next;
+    });
+  };
+
+  const getScaledMacro = (item: any, macroKey: string) => {
+    const scaled = scaleMacros(
+      {
+        calories: item.calories,
+        proteinG: item.proteinG,
+        carbsG: item.carbsG,
+        fatG: item.fatG,
+        fiberG: item.fiberG,
+      },
+      item.servingSize,
+      item.servingUnit,
+      item.userQuantity,
+      item.userUnit
+    );
+    return (scaled as any)[macroKey] || 0;
+  };
+
+  const totalCal = items.reduce((sum, item) => sum + getScaledMacro(item, 'calories'), 0);
+  const totalProtein = items.reduce((sum, item) => sum + getScaledMacro(item, 'proteinG'), 0);
 
   const handleSubmit = async () => {
     if (items.length === 0) {
-      setError("Add at least one food item");
+      setError("Add at least one food item to finalize the log");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const res = await createMealLog(mealType, undefined, visionImageUrl || undefined);
+      const res = await createMealLog(mealType, undefined);
       const logId = res.data.id;
       
-      // Add all items in parallel
       await Promise.all(items.map(item => 
         addMealLogItem(logId, {
           foodName: item.foodName,
-          servingSize: item.servingSize,
-          servingUnit: item.servingUnit,
-          calories: item.calories,
-          proteinG: item.proteinG,
-          carbsG: item.carbsG,
-          fatG: item.fatG,
-          fiberG: item.fiberG,
+          servingSize: item.userQuantity,
+          servingUnit: item.userUnit,
+          calories: getScaledMacro(item, 'calories'),
+          proteinG: getScaledMacro(item, 'proteinG'),
+          carbsG: getScaledMacro(item, 'carbsG'),
+          fatG: getScaledMacro(item, 'fatG'),
+          fiberG: getScaledMacro(item, 'fiberG'),
         })
       ));
 
       onSuccess();
     } catch (err: any) {
-      setError(err.message || "Failed to log meal");
+      setError(err.message || "System synchronization failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
-      onClick={onClose}
-    >
-      <motion.div 
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20, scale: 0.95 }}
-        className="bg-[#0a0a0a] border border-white/10 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>Log Meal</h2>
-            <button onClick={onClose} className="p-2 hover:bg-white/5 transition-colors">
-              <X size={18} className="text-white/40" />
-            </button>
+  const content = (
+    <div className={`relative flex flex-col h-full ${inline ? 'bg-transparent' : ''}`}>
+      {/* Fixed Header */}
+      {!inline && (
+        <div className="flex justify-between items-start p-10 lg:p-12 pb-6 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md z-20">
+          <div>
+            <h2 className="text-4xl font-black italic tracking-tighter text-white" style={{ fontFamily: 'var(--font-display)' }}>Neural Entry Hub</h2>
+            <p className="text-[11px] text-emerald-400 font-bold uppercase tracking-[0.4em] mt-3">Protocol: 100% Text-Only Brain Active</p>
           </div>
+          <button onClick={onClose} className="p-4 border border-white/5 hover:border-emerald-500/20 bg-white/[0.02] transition-all rounded-2xl group">
+            <X size={20} className="text-white/20 group-hover:text-emerald-400" />
+          </button>
+        </div>
+      )}
 
-          {error && (
-            <div className="mb-6 p-3 border border-red-500/30 bg-red-500/5 text-red-400 text-sm rounded-lg">
-              {error}
-            </div>
-          )}
+      {/* Scrollable Content Body */}
+      <div className={`flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-10 lg:p-12 pt-8 ${inline ? 'h-[75vh]' : ''}`}>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, x: -10 }} 
+            animate={{ opacity: 1, x: 0 }}
+            className="mb-8 p-6 border border-emerald-500/10 bg-emerald-500/5 text-emerald-400 text-xs font-bold italic rounded-2xl"
+          >
+            System Error: {error}
+          </motion.div>
+        )}
 
-          {/* Meal Type */}
-          <div className="mb-8">
-            <label className="text-xs text-white/30 tracking-wider mb-3 block font-semibold uppercase" style={{ fontFamily: 'var(--font-label)' }}>Meal Type</label>
-            <div className="flex gap-2">
+        <div className="space-y-12">
+          {/* Meal Type Section */}
+          <div className="space-y-6">
+            <label className="text-[13px] text-white/80 tracking-[0.4em] font-black uppercase" style={{ fontFamily: 'var(--font-label)' }}>Target Interval</label>
+            <div className="flex flex-wrap gap-2">
               {["breakfast", "lunch", "dinner", "snack"].map(t => (
                 <button 
                   key={t} 
                   onClick={() => setMealType(t)}
-                  className={`px-5 py-2.5 text-[13px] tracking-wide rounded-lg transition-all ${
-                    mealType === t ? 'bg-white text-black font-semibold' : 'border border-white/10 text-white/30 hover:text-white/60'
+                  className={`px-8 py-3.5 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all border ${
+                    mealType === t ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'border-white/5 text-white/20 hover:text-white/40 hover:bg-white/[0.02]'
                   }`}
-                  style={{ fontFamily: 'var(--font-label)' }}
                 >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Selected Items */}
-          {items.length > 0 && (
-            <div className="mb-8">
-              <label className="text-xs text-white/30 tracking-wider mb-3 block font-semibold uppercase" style={{ fontFamily: 'var(--font-label)' }}>
-                Items ({items.length}) — {totalCal} kcal / {totalProtein}g protein
-              </label>
-              <div className="space-y-2">
-                {items.map((item, i) => (
-                  <div key={i} className="flex justify-between items-center border border-white/5 p-3 bg-white/[0.02]">
-                    <div>
-                      <span className="text-sm font-medium" style={{ fontFamily: 'var(--font-label)' }}>{item.foodName}</span>
-                      <span className="ml-3 text-xs text-white/30">{item.calories} kcal</span>
-                    </div>
-                    <button onClick={() => removeItem(i)} className="text-red-400/40 hover:text-red-400 transition-colors">
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Search/Browse Foods */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-3">
-              <label className="text-xs text-white/30 tracking-wider font-semibold uppercase" style={{ fontFamily: 'var(--font-label)' }}>
-                {isAiMode ? "Smart AI Interpretation" : (searchTerm ? "Search Results" : "Suggested Items")}
+          {/* Main Interface */}
+          <div className="space-y-6">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-[13px] text-white/80 tracking-[0.4em] font-black uppercase">
+                {isAiMode ? "Smart Intelligence Mode" : "Standard Manual Override"}
               </label>
               <button 
                 onClick={() => setIsAiMode(!isAiMode)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isAiMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/20'}`}
+                className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${isAiMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/5 text-white/20'}`}
               >
                 <Sparkles size={12} />
-                {isAiMode ? "Smart AI Entry" : "Standard Entry"}
+                {isAiMode ? "AI Active" : "Manual Entry"}
               </button>
             </div>
 
             {isAiMode ? (
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                   <button 
-                     onClick={() => setVisionMode(false)}
-                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${!visionMode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/[0.02] border-white/5 text-white/20'}`}
-                   >Text Prompt</button>
-                   <button 
-                     onClick={() => setVisionMode(true)}
-                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${visionMode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/[0.02] border-white/5 text-white/20'}`}
-                   >Visual AI</button>
-                </div>
-
-                {!visionMode ? (
-                  <>
-                    <textarea 
-                      value={aiInput}
-                      onChange={(e) => setAiInput(e.target.value)}
-                      placeholder="e.g. 3 large eggs and an avocado..."
-                      className="w-full h-32 bg-white/[0.02] border border-white/5 p-4 rounded-xl focus:border-emerald-500/30 outline-none text-sm resize-none custom-scrollbar"
-                    />
-                    <button 
-                      onClick={handleAiInterpret}
-                      disabled={isInterpreting || !aiInput.trim()}
-                      className="w-full py-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
-                    >
-                      {isInterpreting ? "Interpreting Algorithm..." : "Run AI Interpretation"}
-                    </button>
-                  </>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="relative group">
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setVisionFile(file);
-                            try {
-                              setIsInterpreting(true);
-                              const res = await analyzeImage(file);
-                              setVisionImageUrl(res.imageUrl);
-                              setItems(res.data);
-                            } catch (err: any) {
-                              alert(err.message);
-                            } finally {
-                              setIsInterpreting(false);
-                            }
-                          }
-                        }}
-                      />
-                      <div className="w-full h-40 border-2 border-dashed border-white/5 group-hover:border-emerald-500/30 bg-white/[0.02] rounded-2xl flex flex-col items-center justify-center gap-4 transition-all">
-                        {visionFile ? (
-                           <div className="flex flex-col items-center">
-                              <div className="w-20 h-20 rounded-xl overflow-hidden border border-white/10 mb-2">
-                                <img src={URL.createObjectURL(visionFile)} alt="" className="w-full h-full object-cover" />
-                              </div>
-                              <p className="text-[10px] font-black text-emerald-400 uppercase">{visionFile.name}</p>
-                           </div>
-                        ) : (
-                          <>
-                            <Camera size={32} className="text-white/20 group-hover:text-emerald-400" />
-                            <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Snap or Upload Plate</p>
-                          </>
-                        )}
-                      </div>
+              <div className="space-y-6">
+                <div className="relative group">
+                  <textarea 
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder='Describe your meal like a scientist. "120g seared sea bass with a handful of microgreens and half a cup of quinoa"...'
+                    className="w-full h-44 bg-white/[0.02] border border-white/5 p-8 rounded-[2.5rem] focus:border-emerald-500/20 outline-none text-base italic leading-relaxed text-white/80 placeholder:text-white/40 resize-none transition-all custom-scrollbar"
+                  />
+                  <div className="absolute bottom-6 right-8 flex gap-3">
+                    <div className="px-3 py-1.5 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                      <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Neural Link v1.5 Stable</span>
                     </div>
-                    {isInterpreting && <p className="text-center text-[10px] font-black text-emerald-400 uppercase animate-pulse">Running Vision Engine...</p>}
                   </div>
-                )}
+                </div>
+                
+                <button 
+                  onClick={handleAiInterpret}
+                  disabled={isInterpreting || !aiInput.trim()}
+                  className="w-full py-6 bg-white text-black hover:bg-emerald-400 hover:text-white transition-all rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-4 disabled:opacity-20"
+                >
+                  {isInterpreting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent animate-spin rounded-full" />
+                      Analyzing Physiological Impact...
+                    </>
+                  ) : (
+                    <>Deconstruct Meal Composition <ChevronRight size={16}/></>
+                  )}
+                </button>
               </div>
-
             ) : (
-              <>
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/15" size={16} />
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <div className="relative group">
+                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-white/10 group-focus-within:text-emerald-400 transition-colors" size={18} />
                   <input 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3.5 bg-white/[0.02] border border-white/5 focus:border-white/20 outline-none text-sm text-white placeholder:text-white/15 rounded-lg"
-                    placeholder="Search real foods (Edamam)..."
+                    className="w-full pl-16 pr-6 py-6 bg-white/[0.02] border border-white/5 focus:border-emerald-500/20 outline-none text-sm text-white placeholder:text-white/40 rounded-[1.5rem] transition-all"
+                    placeholder="Search Edamam Food Database..."
                   />
                   {isSearching && (
-                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                       <div className="w-4 h-4 border-2 border-white/20 border-t-emerald-500 animate-spin rounded-full"></div>
+                     <div className="absolute right-6 top-1/2 -translate-y-1/2">
+                       <div className="w-5 h-5 border-2 border-emerald-500/10 border-t-emerald-500 animate-spin rounded-full"></div>
                      </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-8">
                   {searchTerm.length > 2 ? (
                     searchResults.map((food, i) => (
                       <button 
                         key={i}
                         onClick={() => addItemFromSearch(food)}
-                        className="group border border-white/5 p-3 text-left hover:border-emerald-400/20 hover:bg-white/[0.02] transition-all flex justify-between items-center rounded-lg"
+                        className="group border border-white/5 p-4 text-left hover:border-emerald-500/20 hover:bg-emerald-500/[0.02] transition-all flex justify-between items-center rounded-2xl relative overflow-hidden"
                       >
-                        <div className="flex gap-3 items-center">
-                          {food.image && <img src={food.image} alt="" className="w-10 h-10 rounded object-cover border border-white/5" />}
-                          <div>
-                            <p className="text-sm font-medium" style={{ fontFamily: 'var(--font-label)' }}>{food.label}</p>
-                            <p className="text-xs text-white/20 mt-0.5">{Math.round(food.calories)} kcal · {Math.round(food.protein)}g P</p>
+                        <div className="flex gap-4 items-center min-w-0">
+                          {food.image && <img src={food.image} alt="" className="w-12 h-12 rounded-xl object-cover border border-white/5 shadow-2xl" />}
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-black italic tracking-tight truncate">{food.label}</p>
+                            <p className="text-[9px] text-white/20 mt-1 font-bold uppercase tracking-widest">{Math.round(food.calories)} kcal · {Math.round(food.protein)}g P</p>
                           </div>
                         </div>
-                        <Plus size={14} className="text-white/20 group-hover:text-emerald-400 transition-colors" />
+                        <Plus size={16} className="text-white/10 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
                       </button>
                     ))
                   ) : (
@@ -1185,45 +1443,168 @@ function AddMealModal({
                       <button 
                         key={i}
                         onClick={() => addItem(food)}
-                        className="group border border-white/10 p-4 text-left hover:border-emerald-400/30 hover:bg-emerald-400/5 transition-all flex justify-between items-center rounded-xl relative overflow-hidden"
+                        className="group border border-white/5 p-5 text-left hover:border-emerald-500/30 hover:bg-emerald-500/[0.03] transition-all flex justify-between items-center rounded-[1.5rem] relative overflow-hidden"
                       >
-                        <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <Sparkles size={10} className="text-emerald-400/40" />
+                        <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <Sparkles size={10} className="text-emerald-400/20" />
                         </div>
                         <div>
-                          <p className="text-sm font-bold italic tracking-tight">{food.foodName}</p>
-                          <p className="text-[10px] text-white/20 mt-0.5 font-black uppercase tracking-widest">{food.calories} kcal · {food.proteinG}g P</p>
+                          <p className="text-[13px] font-black italic tracking-tight">{food.foodName}</p>
+                          <p className="text-[9px] text-white/20 mt-1 font-black uppercase tracking-[0.2em]">{food.calories} kcal · {food.proteinG}g P</p>
                         </div>
-                        <Plus size={14} className="text-white/20 group-hover:text-emerald-400 transition-colors" />
+                        <Plus size={16} className="text-white/10 group-hover:text-emerald-400 transition-colors" />
                       </button>
                     ))
                   )}
                 </div>
-              </>
+              </div>
             )}
           </div>
 
+          {/* Selected Items Feed */}
+          {items.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pt-4 border-t border-white/5">
+              <div className="flex justify-between items-baseline px-1">
+                <label className="text-[13px] text-white/80 tracking-[0.4em] font-black uppercase">Consolidated Intake Breakdown</label>
+                <span className="text-sm font-black italic tracking-tighter text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]">{totalCal} kcal · {totalProtein}g protein</span>
+              </div>
+              <div className="flex flex-col gap-3">
+                {items.map((item, i) => (
+                  <div key={i} className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border border-white/5 p-6 bg-white/[0.01] rounded-[2rem] group/item transition-all hover:bg-white/[0.02]">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-black italic tracking-tight truncate text-white/90">{item.foodName}</p>
+                      <div className="flex items-center gap-3 mt-2">
+                         <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
+                           {getScaledMacro(item, 'calories')} kcal
+                         </span>
+                         <span className="text-[9px] text-white/20 font-bold uppercase tracking-widest">
+                           {getScaledMacro(item, 'proteinG')}g protein
+                         </span>
+                      </div>
+                    </div>
 
-          {/* Submit */}
-          <button 
-            onClick={handleSubmit}
-            disabled={loading || items.length === 0}
-            className="w-full py-5 flex items-center justify-center gap-3 text-sm bg-white text-black border border-white hover:bg-transparent hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold tracking-wide rounded-lg"
-            style={{ fontFamily: 'var(--font-label)' }}
-          >
-            {loading ? "Logging..." : "Log Meal"} <ChevronRight size={16}/>
-          </button>
+                    <div className="flex flex-col flex-1 w-full gap-4">
+                      <div className="flex items-center gap-2 bg-white/[0.02] border border-white/5 p-1.5 rounded-2xl group-hover/item:border-emerald-500/20 transition-all max-w-fit">
+                        <input 
+                          type="number"
+                          value={item.userQuantity ?? 0}
+                          onChange={(e) => updateItemQty(i, parseFloat(e.target.value) || 0)}
+                          className="w-16 bg-transparent outline-none text-right text-[11px] font-black text-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <select 
+                          value={item.userUnit ?? "g"}
+                          onChange={(e) => updateItemUnit(i, e.target.value)}
+                          className="bg-transparent outline-none text-[9px] font-black uppercase text-white/40 cursor-pointer pr-2 hover:text-white transition-colors"
+                        >
+                          {Object.keys(UNIT_MAP).map(u => (
+                            <option key={u} value={u} className="bg-[#050505]">{u}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <MetabolicRuler 
+                        value={item.userQuantity} 
+                        onChange={(val) => updateItemQty(i, val)} 
+                        unit={item.userUnit}
+                        max={item.userUnit === 'g' ? 1000 : (item.userUnit === 'oz' ? 32 : 10)}
+                      />
+                    </div>
+
+                    <button onClick={() => removeItem(i)} className="p-3 text-white/5 hover:text-rose-500/60 hover:bg-rose-500/5 transition-all rounded-xl">
+                      <X size={14} strokeWidth={3} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
+
+        {/* Spacer for bottom overlap prevention */}
+        <div className="h-32" />
+      </div>
+
+      {/* Fixed Footer */}
+      <div className={`p-10 lg:p-12 pt-6 border-t border-white/5 bg-[#050505]/80 backdrop-blur-md z-20 mt-auto ${inline ? 'rounded-b-[3.5rem]' : ''}`}>
+        <button 
+          onClick={handleSubmit}
+          disabled={loading || items.length === 0}
+          className="w-full py-7 flex items-center justify-center gap-4 text-base bg-emerald-500 text-white hover:bg-emerald-400 transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed font-black uppercase tracking-[0.3em] rounded-3xl shadow-[0_20px_50px_rgba(16,185,129,0.2)]"
+        >
+          {loading ? (
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin rounded-full" />
+              Syncing Protocol...
+            </div>
+          ) : (
+            <>Finalize Daily Log <ChevronRight size={18} strokeWidth={3}/></>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
+  if (inline) return content;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6 lg:p-12 overflow-hidden"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 40 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 40 }}
+        transition={{ type: "spring", damping: 30, stiffness: 200 }}
+        className="bg-[#050505] border border-white/5 w-full max-w-2xl h-[85vh] overflow-hidden rounded-[3.5rem] relative shadow-[0_40px_100px_rgba(0,0,0,0.8)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="absolute inset-0 bg-grain opacity-[0.03] pointer-events-none" />
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-500/10 blur-[120px] rounded-full" />
+        {content}
       </motion.div>
+    </motion.div>
+  );
+}
+
+/**
+ * IntakeTab
+ * Dedicated interface for logging meals, integrated directly into the dashboard flow.
+ */
+function IntakeTab({ profile, onSuccess, pendingItem }: { profile: any, onSuccess: () => void, pendingItem: any }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.98 }} 
+      animate={{ opacity: 1, scale: 1 }}
+      className="max-w-4xl mx-auto"
+    >
+      <div className="mb-12">
+        <h2 className="text-6xl font-black italic tracking-tighter mb-4" style={{ fontFamily: 'var(--font-display)' }}>Neural Entry Hub</h2>
+        <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.4em]">Protocol: Systematic Intake Documentation Active</p>
+      </div>
+
+      <div className="bg-[#080808] border border-white/5 rounded-[4rem] overflow-hidden shadow-2xl">
+        <AddMealModal 
+          inline={true}
+          onClose={() => {}} 
+          onSuccess={onSuccess}
+          profile={profile}
+          pendingItem={pendingItem}
+        />
+      </div>
     </motion.div>
   );
 }
 
 // ─── COMMUNITY TAB ──────────────────────────────────────────────────────────
 
-import { listTribes, joinTribe, getLeaderboard } from "@/utils/api";
 
-function CommunityTab() {
+
+
+function CommunityTab({ userName }: { userName: string }) {
   const [tribes, setTribes] = useState<any[]>([]);
   const [selectedTribe, setSelectedTribe] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -1334,31 +1715,124 @@ function CommunityTab() {
               {leaderboard.length === 0 ? (
                 <p className="text-xs text-white/20 italic text-center py-10">Waiting for first cohort to verify...</p>
               ) : (
-                leaderboard.map((user, i) => (
-                  <div key={i} className="flex items-center gap-4 group">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${
-                      i === 0 ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 
-                      i === 1 ? 'bg-white/20 text-white' : 
-                      i === 2 ? 'bg-white/10 text-white/60' : 'bg-white/5 text-white/20'
-                    }`}>
-                      {i + 1}
-                    </div>
-                    <div className="flex-1">
-                       <p className="text-sm font-bold group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{user.userName}</p>
-                       <p className="text-[10px] text-white/20 font-black tracking-widest uppercase">{user.points} Protocol Points</p>
-                    </div>
-                    {i === 0 && <Trophy size={16} className="text-emerald-400" />}
-                  </div>
-                ))
+                leaderboard.map((user, i) => {
+                  const isUser = user.userName === userName;
+                  return (
+                    <motion.div 
+                      key={i} 
+                      whileHover={{ x: 4 }}
+                      className={`flex items-center gap-5 group p-2 rounded-2xl transition-all ${isUser ? 'bg-emerald-500/5 border border-emerald-500/10' : ''}`}
+                    >
+                      <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center font-black text-sm relative overflow-hidden transition-all ${
+                        i === 0 ? 'bg-emerald-500 text-white shadow-[0_0_30px_rgba(16,185,129,0.4)] scale-110' : 
+                        i === 1 ? 'bg-white/20 text-white' : 
+                        i === 2 ? 'bg-white/10 text-white/60' : 'bg-white/5 text-white/20'
+                      }`}>
+                        {i + 1}
+                        {i < 3 && <div className="absolute inset-0 bg-white/10 animate-pulse" />}
+                      </div>
+                      <div className="flex-1">
+                         <p className={`text-sm font-bold uppercase tracking-tight transition-colors ${i === 0 ? 'text-emerald-400' : 'text-white/80'} ${isUser ? 'underline decoration-emerald-500/40 underline-offset-4' : ''}`}>
+                           {user.userName} {isUser && <span className="text-[8px] ml-2 text-emerald-400/60 font-black tracking-[0.2em]">(YOU)</span>}
+                         </p>
+                         <div className="flex items-center gap-3 mt-1">
+                           <p className="text-[10px] text-white/20 font-black tracking-widest uppercase">{user.points} Protocol Points</p>
+                           {i === 0 && <div className="px-2 py-0.5 bg-emerald-500/10 rounded-md text-[7px] font-black text-emerald-400 uppercase tracking-tighter">Current Apex</div>}
+                         </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        {i === 0 ? <Trophy size={20} strokeWidth={2.5} className="text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]" /> : 
+                         i === 1 ? <Target size={16} className="text-white/20" /> : 
+                         i === 2 ? <Activity size={16} className="text-white/10" /> : null}
+                      </div>
+                    </motion.div>
+                  );
+                })
               )}
             </div>
             <div className="mt-10 pt-10 border-t border-white/5 text-center">
-               <p className="text-[10px] text-white/20 font-bold uppercase tracking-[0.3em]">Next Cycle: Monday 00:00</p>
+                <p className="text-[10px] text-white/20 font-bold uppercase tracking-[0.3em]">Next Cycle: Monday 00:00</p>
             </div>
           </div>
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function CoachModal({ onClose, coachInsights }: any) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-white">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }} 
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-3xl" 
+      />
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+        animate={{ scale: 1, opacity: 1, y: 0 }} 
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        className="w-full max-w-2xl bg-[#0a0a0a] border border-white/5 rounded-[4rem] p-16 relative z-10 shadow-[0_50px_100px_rgba(0,0,0,1)] overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+           <Sparkles size={200} strokeWidth={0.5} />
+        </div>
+
+        <button onClick={onClose} className="absolute top-12 right-12 p-4 text-white/20 hover:text-white transition-colors">
+          <X size={24} />
+        </button>
+
+        <div className="mb-16">
+          <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.5em] mb-4">Precision Nutrition Analysis</p>
+          <h2 className="text-5xl font-black italic tracking-tighter" style={{ fontFamily: 'var(--font-display)' }}>Nutritional Intelligence Assistant</h2>
+        </div>
+
+        <div className="space-y-12 relative z-10">
+          <div className="p-10 bg-white/[0.02] border border-white/5 rounded-[2.5rem]">
+            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-6">Current Feedback</h4>
+            <p className="text-2xl text-white/80 leading-snug italic font-medium">
+              "{coachInsights?.data?.advice || "Awaiting metabolic sync..."}"
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="p-8 border border-white/5 bg-white/[0.01] rounded-[2rem]">
+               <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 mb-4">Target Alignment</p>
+               <div className="flex items-baseline gap-2">
+                 <span className="text-4xl font-black italic text-emerald-400">
+                   {coachInsights?.data ? Math.round((coachInsights.data.intake.calories / coachInsights.data.targets.calories) * 100) : 0}%
+                 </span>
+                 <span className="text-[10px] text-white/10 font-black uppercase">Accuracy</span>
+               </div>
+            </div>
+            <div className="p-8 border border-white/5 bg-white/[0.01] rounded-[2rem]">
+               <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 mb-4">Recommendation</p>
+               <div className="flex items-baseline gap-2">
+                 <span className="text-4xl font-black italic text-white/80">
+                    {coachInsights?.data?.suggestion?.amount || "0"}
+                 </span>
+                 <span className="text-[10px] text-white/10 font-black uppercase">
+                    {coachInsights?.data?.suggestion?.unit || ""} {coachInsights?.data?.suggestion?.type || "STABLE"}
+                 </span>
+               </div>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-white/5">
+             <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.4em] text-center italic">Calculated in real-time based on active physiological mandates.</p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 

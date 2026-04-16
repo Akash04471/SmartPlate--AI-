@@ -5,6 +5,8 @@ import {
 } from 'drizzle-orm/pg-core';
 
 
+
+
 // ── Existing ────────────────────────────────────────────────────────────────
 
 export const users = pgTable('users', {
@@ -48,21 +50,19 @@ export const mealLogItems = pgTable('meal_log_items', {
 
 // ── NEW ─────────────────────────────────────────────────────────────────────
 
-export const activityLevelEnum = pgEnum('activity_level', [
-  'sedentary',
-  'lightly_active',
-  'moderately_active',
-  'very_active',
-  'extra_active',
-]);
+export const activityLevelEnum = pgEnum('activity_level', ['sedentary', 'lightly_active', 'moderately_active', 'very_active', 'extra_active']);
+export const genderEnum = pgEnum('gender', ['male', 'female', 'other']);
 
 export const goalTypeEnum = pgEnum('goal_type', [
   'lose_weight',
-  'maintain_weight',
   'gain_muscle',
+  'maintain_weight',
   'improve_endurance',
   'general_health',
+  'extreme_loss', // Special backend-calculated tier
 ]);
+
+
 
 export const dietPreferenceEnum = pgEnum('diet_preference', [
   'omnivore',
@@ -77,8 +77,9 @@ export const userProfiles = pgTable('user_profiles', {
   age:         integer('age'),
   gender:      genderEnum('gender'),
   heightCm:    integer('height_cm'),
-  weightKg:    doublePrecision('weight_kg'),
+  weightKg:    real('weight_kg'),
   activityLevel: activityLevelEnum('activity_level').default('sedentary'),
+
   birthDate:   timestamp('birth_date'),
   goalType:    goalTypeEnum('goal_type').default('general_health'),
   dietPreference:   dietPreferenceEnum('diet_preference'),

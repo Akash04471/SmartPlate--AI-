@@ -1,30 +1,33 @@
 import { db } from '../db/index.js';
-import { mealLogs, mealLogItems, userProfiles } from '../db/schema.js';
-import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { mealLogs, mealLogItems, userProfiles, healthProtocols } from '../db/schema.js';
+import { eq, and, gte, lte, desc } from 'drizzle-orm';
 
 /**
  * GET /api/coach/insights
- * Proactive AI Coaching logic based on daily macro gaps.
+ * Proactive AI Metabolic Analysis based on daily macro gaps and active protocols.
  */
 export const getCoachInsights = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    // 1. Fetch user profile and goals
-    const [profile] = await db
-      .select()
-      .from(userProfiles)
-      .where(eq(userProfiles.userId, userId));
+    // 1. Fetch user profile and active protocols
+    const [profile, activeProtocols] = await Promise.all([
+      db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).then(rows => rows[0]),
+      db.select().from(healthProtocols).where(and(
+        eq(healthProtocols.userId, userId),
+        eq(healthProtocols.status, 'active')
+      )).orderBy(desc(healthProtocols.createdAt))
+    ]);
 
     if (!profile) {
-      return res.status(404).json({ error: 'Profile not found. Set up your goals first!' });
+      return res.status(404).json({ error: 'Profile not found. Initialize your metabolic goals to begin.' });
     }
 
-    // PRIVACY GUARD: Only return insights if user has enabled the coach
+    // PRIVACY GUARD: Only return insights if user has enabled the assistant
     if (!profile.coachEnabled) {
       return res.json({ 
         enabled: false, 
-        message: 'AI Coaching is currently disabled. Enable it in settings for personalized insights!' 
+        message: 'AI Metabolic Analysis is currently on standby. Enable in settings for precision insights.' 
       });
     }
 
@@ -57,38 +60,53 @@ export const getCoachInsights = async (req, res, next) => {
       fat: acc.fat + (item.fat || 0),
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-    // 4. Generate Support Advice (Casual/Supportive Tone)
-    let advice = "You're off to a great start! Keep logging your meals to see how your day balances out.";
+    // 4. Determine Targets (Protocol-Aware)
+    // If an active protocol exists, use its targets over the profile targets.
+    const activeProtocol = activeProtocols[0];
+    const targets = {
+      calories: activeProtocol?.targetCalories || profile.dailyCalorieTarget || 2000,
+      protein:  activeProtocol?.targetProteinG  || profile.dailyProteinTargetG || 150,
+      carbs:    activeProtocol?.targetCarbsG    || profile.dailyCarbsTargetG   || 200,
+      fat:      activeProtocol?.targetFatG      || profile.dailyFatTargetG     || 70,
+    };
+
+    // 5. Generate Professional Metabolic Feedback
+    let advice = "System initialized. Log today's first nutritional entry to begin metabolic analysis.";
     let suggestion = null;
 
     if (logs.length > 0) {
-      const proteinGap = (profile.dailyProteinTargetG || 0) - intake.protein;
-      const calGap = (profile.dailyCalorieTarget || 0) - intake.calories;
+      const proteinGap = targets.protein - intake.protein;
+      const calGap = targets.calories - intake.calories;
+
+      if (activeProtocol) {
+        advice = `Current Protocol: "${activeProtocol.title}" is active. `;
+      } else {
+        advice = "Standard Metabolic Tracking active. ";
+      }
 
       if (proteinGap > 30) {
-        advice = "You're doing awesome today! I noticed you're a little behind on your protein—maybe try adding some chicken, tofu, or a protein shake to your next meal? You've got this!";
+        advice += `Your protein availability is currently sub-optimal by ${Math.round(proteinGap)}g. Prioritize lean amino acid sources in your next cycle to maintain muscle synthesis.`;
         suggestion = { type: 'protein', amount: Math.round(proteinGap), unit: 'g' };
       } else if (calGap > 500) {
-        advice = "Great job staying consistent! You still have plenty of energy room for the day. Feel free to enjoy a healthy snack to keep your metabolism humming!";
+        advice += `Metabolic window detected: You have approximately ${Math.round(calGap)} kcal remaining. Consider a nutrient-dense snack to stabilize energy flux.`;
         suggestion = { type: 'calories', amount: Math.round(calGap), unit: 'kcal' };
       } else if (calGap < -100) {
-        advice = "Whoops, looks like we went a bit over our calorie target today. No sweat! It happens to everyone. Let's aim for a lighter, nutrient-dense meal for dinner.";
+        advice += `Caloric threshold exceeded by ${Math.round(Math.abs(calGap))} kcal. Correcting trajectory: Focus on high-volume, low-calorie micronutrients for the remainder of the 24-hour cycle.`;
         suggestion = { type: 'moderation', amount: 0, unit: '' };
       } else {
-        advice = "Incredible work! You are tracking perfectly on your targets. Your body is going to thank you for this consistency!";
+        advice = activeProtocol 
+          ? `Exceptional adherence to "${activeProtocol.title}". Your physiological markers are trending toward optimal alignment.`
+          : "Total adherence detected. Your current nutritional velocity is perfectly synchronized with your metabolic targets.";
       }
     }
 
     res.json({
       enabled: true,
+      protocolActive: !!activeProtocol,
+      protocolTitle: activeProtocol?.title,
       data: {
         intake,
-        targets: {
-          calories: profile.dailyCalorieTarget,
-          protein: profile.dailyProteinTargetG,
-          carbs: profile.dailyCarbsTargetG,
-          fat: profile.dailyFatTargetG,
-        },
+        targets,
         advice,
         suggestion
       }

@@ -81,14 +81,15 @@ function calculateMetabolicTargets(data) {
 
   // 3. Adjust for Goal
   let calories = tdee;
-  if (goalType === 'weight_loss') calories -= 500;
+  if (goalType === 'weight_loss' || goalType === 'lose_weight') calories -= 500;
   if (goalType === 'extreme_loss') calories -= 750;
-  if (goalType === 'muscle_gain' || goalType === 'bulking') calories += 300;
+  if (goalType === 'muscle_gain' || goalType === 'gain_muscle' || goalType === 'bulking') calories += 300;
 
   // 4. Calculate Macros
   // Protein: 1.8g per kg for muscle gain/loss, 1.2g for maintenance
-  const proteinMultiplier = (goalType === 'muscle_gain' || goalType === 'weight_loss') ? 1.8 : 1.4;
+  const proteinMultiplier = (goalType === 'muscle_gain' || goalType === 'gain_muscle' || goalType === 'weight_loss' || goalType === 'lose_weight') ? 1.8 : 1.4;
   const proteinG = Math.round(weightKg * proteinMultiplier);
+
   
   // Fat: 25% of calories
   const fatG = Math.round((calories * 0.25) / 9);

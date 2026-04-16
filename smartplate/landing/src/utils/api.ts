@@ -232,6 +232,44 @@ export async function seedTribes() {
   return apiFetch("/tribes/seed", { method: "POST" });
 }
 
+// ─── Health Protocols ────────────────────────────────────────────────────────
+export async function getProtocols(status?: string) {
+  const q = status ? `?status=${status}` : "";
+  return apiFetch<{ data: any[] }>(`/protocols${q}`);
+}
+
+export async function getProtocolById(id: string) {
+  return apiFetch<{ data: any }>(`/protocols/${id}`);
+}
+
+export async function createProtocol(data: any) {
+  return apiFetch<{ data: any }>("/protocols", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateProtocol(id: string, data: any) {
+  return apiFetch<{ data: any }>(`/protocols/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteProtocol(id: string) {
+  return apiFetch(`/protocols/${id}`, { method: "DELETE" });
+}
+
+export async function getProtocolSummary() {
+  return apiFetch<{ 
+    data: { 
+      activeProtocols: any[]; 
+      todayStats: any; 
+      date: string 
+    } 
+  }>("/protocols/summary");
+}
+
 // ─── AI Vision ──────────────────────────────────────────────────────────────
 
 export async function analyzeImage(file: File) {

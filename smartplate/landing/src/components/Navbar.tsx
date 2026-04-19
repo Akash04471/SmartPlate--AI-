@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, useMotionValueEvent, useScroll } from "framer-motion";
+import { motion, AnimatePresence, useMotionValueEvent, useScroll } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 
 const navLinks = [
     { label: "How it Works", href: "#features" },
     { label: "Diet Plans", href: "#diets" },
     { label: "Tracking", href: "#features" },
-    { label: "Rewards", href: "#features" },
+    { label: "Rewards", href: "#rewards" },
     { label: "Testimonials", href: "#testimonials" },
 ];
 
@@ -39,8 +40,14 @@ export default function Navbar() {
                 transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
             >
                 {/* Logo */}
-                <a href="#" className="text-2xl font-bold tracking-tight text-white hover:opacity-70 transition-opacity" style={{ fontFamily: 'var(--font-display)' }}>
-                    SmartPlate
+                <a href="/" className="hover:opacity-80 transition-all flex items-center gap-3">
+                    <Image 
+                        src="/images/smartplate-logo.jpg" 
+                        alt="SmartPlate Logo" 
+                        width={140} 
+                        height={40} 
+                        className="h-8 md:h-10 w-auto object-contain"
+                    />
                 </a>
 
                 {/* Desktop Links */}
@@ -49,7 +56,7 @@ export default function Navbar() {
                         <li key={link.label}>
                             <a
                                 href={link.href}
-                                className="text-[12px] uppercase tracking-[0.2em] text-text-secondary hover:text-white transition-colors duration-300 font-semibold"
+                                className="text-[11px] uppercase tracking-[0.3em] text-white/40 hover:text-white transition-colors duration-300 font-black"
                                 style={{ fontFamily: 'var(--font-label)' }}
                             >
                                 {link.label}
@@ -62,75 +69,91 @@ export default function Navbar() {
                 <div className="hidden lg:flex items-center gap-8">
                     <Link 
                         href="/auth/login"
-                        className="text-[12px] uppercase tracking-[0.2em] text-text-secondary hover:text-white transition-colors font-semibold"
+                        className="text-[11px] uppercase tracking-[0.3em] text-white/40 hover:text-white transition-colors font-black"
                         style={{ fontFamily: 'var(--font-label)' }}
                     >
                         Login
                     </Link>
                     <Link
                         href="/auth/signup"
-                        className="relative group px-8 py-3 bg-white text-black text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-transparent hover:text-white border border-white transition-all duration-300 rounded-full overflow-hidden"
+                        className="relative group px-8 py-3.5 bg-white text-black text-[11px] font-black uppercase tracking-[0.1em] hover:bg-emerald-500 hover:text-white transition-all duration-300 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.1)]"
                         style={{ fontFamily: 'var(--font-label)' }}
                     >
-                        <motion.span
-                            className="absolute inset-0 bg-white/20"
-                            animate={{
-                                scale: [1, 1.5],
-                                opacity: [0.5, 0],
-                            }}
-                            transition={{
-                                duration: 2,
-                                repeat: Infinity,
-                                ease: "easeOut",
-                            }}
-                        />
-                        <span className="relative z-10">Get Started</span>
+                        Get Started
                     </Link>
                 </div>
 
                 {/* Mobile toggle */}
                 <button
-                    className="lg:hidden text-text-secondary p-2 text-[11px] uppercase tracking-[0.2em] font-bold"
+                    className="lg:hidden flex items-center gap-3 text-white/40 p-2 text-[10px] uppercase tracking-[0.3em] font-black group transition-all"
                     style={{ fontFamily: 'var(--font-label)' }}
                     onClick={() => setMobileOpen(!mobileOpen)}
                     aria-label="Toggle menu"
                 >
-                    {mobileOpen ? "CLOSE" : "MENU"}
+                    <span className="group-hover:text-emerald-400">{mobileOpen ? "CLOSE" : "MENU"}</span>
+                    <div className="flex flex-col gap-1 w-5">
+                       <div className={`h-[2px] w-full bg-current transition-all ${mobileOpen ? 'rotate-45 translate-y-[6px]' : ''}`} />
+                       <div className={`h-[2px] w-full bg-current transition-all ${mobileOpen ? 'opacity-0' : ''}`} />
+                       <div className={`h-[2px] w-full bg-current transition-all ${mobileOpen ? '-rotate-45 -translate-y-[6px]' : ''}`} />
+                    </div>
                 </button>
             </motion.nav>
 
             {/* Mobile Menu */}
-            {mobileOpen && (
-                <motion.div
-                    className="fixed inset-0 z-[99] bg-base-dark flex flex-col items-center justify-center gap-12"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                >
-                    {navLinks.map((link, i) => (
-                        <motion.a
-                            key={link.label}
-                            href={link.href}
-                            className="text-4xl font-bold text-text-primary hover:text-accent transition-colors"
-                            style={{ fontFamily: 'var(--font-display)' }}
-                            onClick={() => setMobileOpen(false)}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.05 * i, duration: 0.6 }}
-                        >
-                            {link.label}
-                        </motion.a>
-                    ))}
-                    <a
-                        href="/auth/signup"
-                        className="mt-8 px-12 py-4 bg-white text-black text-xs font-bold uppercase tracking-widest rounded-full"
-                        style={{ fontFamily: 'var(--font-label)' }}
-                        onClick={() => setMobileOpen(false)}
+            <AnimatePresence>
+                {mobileOpen && (
+                    <motion.div
+                        className="fixed inset-0 z-[99] bg-base-dark/95 backdrop-blur-3xl flex flex-col items-center justify-center p-12 text-center"
+                        initial={{ opacity: 0, scale: 1.1 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.1 }}
+                        transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
                     >
-                        Get Started
-                    </a>
-                </motion.div>
-            )}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-white/[0.01] rounded-full blur-[140px] pointer-events-none" />
+                        
+                        <div className="flex flex-col gap-10 relative z-10 w-full">
+                            {navLinks.map((link, i) => (
+                                <motion.a
+                                    key={link.label}
+                                    href={link.href}
+                                    className="text-4xl md:text-5xl font-black text-white hover:text-emerald-400 transition-colors italic tracking-tighter"
+                                    style={{ fontFamily: 'var(--font-display)' }}
+                                    onClick={() => setMobileOpen(false)}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.05 * i, duration: 0.6 }}
+                                >
+                                    {link.label}
+                                </motion.a>
+                            ))}
+                            
+                            <motion.div 
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="flex flex-col gap-6 pt-12 border-t border-white/5 mt-4"
+                            >
+                                <Link 
+                                    href="/auth/login"
+                                    className="text-[12px] font-black uppercase tracking-[0.4em] text-white/30 hover:text-white transition-colors"
+                                    style={{ fontFamily: 'var(--font-label)' }}
+                                    onClick={() => setMobileOpen(false)}
+                                >
+                                    Access Port
+                                </Link>
+                                <Link
+                                    href="/auth/signup"
+                                    className="px-12 py-5 bg-white text-black text-[12px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.1)] active:scale-95 transition-all"
+                                    style={{ fontFamily: 'var(--font-label)' }}
+                                    onClick={() => setMobileOpen(false)}
+                                >
+                                    Initialize
+                                </Link>
+                            </motion.div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </>
     );
 }

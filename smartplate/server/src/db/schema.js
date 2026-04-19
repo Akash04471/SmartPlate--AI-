@@ -14,8 +14,21 @@ export const users = pgTable('users', {
   name:         text('name').notNull(),
   email:        text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  isVerified:   boolean('is_verified').default(false).notNull(),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
   updatedAt:    timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const otpTypeEnum = pgEnum('otp_type', ['signup', 'login']);
+
+export const otps = pgTable('otps', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  email:     text('email').notNull(),
+  code:      text('code').notNull(),
+  type:      otpTypeEnum('type').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 export const mealTypeEnum = pgEnum('meal_type', [

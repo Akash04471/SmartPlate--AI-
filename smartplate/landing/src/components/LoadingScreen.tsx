@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 
 interface LoadingScreenProps {
   onComplete: () => void;
@@ -196,25 +197,21 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
             {/* Morphing Shape + Progress Arc */}
             <MorphingShape progress={progress} />
 
-            {/* Brand Name — Staggered Character Reveal */}
-            <div className="flex gap-[3px] overflow-hidden">
-              {brandName.split("").map((char, i) => (
-                <motion.span
-                  key={i}
-                  className="text-[13px] font-bold tracking-[0.35em] text-white/70"
-                  style={{ fontFamily: "var(--font-label)" }}
-                  initial={{ y: 30, opacity: 0, filter: "blur(4px)" }}
-                  animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-                  transition={{
-                    delay: 0.1 + i * 0.04,
-                    duration: 0.5,
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                >
-                  {char}
-                </motion.span>
-              ))}
-            </div>
+            {/* Logo Animation */}
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0, filter: "blur(10px)" }}
+              animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
+              transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
+              className="relative w-48 md:w-64"
+            >
+              <Image 
+                src="/images/smartplate-logo.jpg" 
+                alt="SmartPlate Logo" 
+                width={300} 
+                height={100}
+                className="w-full h-auto object-contain brightness-110 contrast-110"
+              />
+            </motion.div>
 
             {/* Phase Text */}
             <AnimatePresence mode="wait">

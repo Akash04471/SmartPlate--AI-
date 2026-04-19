@@ -25,6 +25,7 @@ import { scaleMacros, UNIT_MAP } from "@/utils/unitConverter";
 import GlassTilt from "@/components/GlassTilt";
 import FoodParticles from "@/components/FoodParticles";
 import MetabolicRuler from "@/components/MetabolicRuler";
+import Image from "next/image";
 
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
@@ -268,14 +269,20 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-base-dark text-white relative overflow-hidden">
+    <div className="flex min-h-screen bg-base-dark text-white relative overflow-x-hidden">
       {/* Living Background */}
       <FoodParticles count={6} />
       
-      {/* ─── SIDEBAR ────────────────────────────────────────── */}
-      <aside className="w-64 border-r border-white/5 bg-[#080808] flex flex-col p-6">
+      {/* ─── SIDEBAR (Desktop) ────────────────────────────────────────── */}
+      <aside className="hidden lg:flex w-64 border-r border-white/5 bg-[#080808] flex-col p-6 sticky top-0 h-screen">
         <div className="mb-12">
-          <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>SmartPlate</h2>
+          <Image 
+            src="/images/smartplate-logo.jpg" 
+            alt="SmartPlate Logo" 
+            width={160} 
+            height={50}
+            className="w-40 h-auto object-contain"
+          />
         </div>
         
         <nav className="flex-1 space-y-1">
@@ -303,7 +310,7 @@ export default function DashboardPage() {
       </aside>
 
       {/* ─── MAIN CONTENT ───────────────────────────────────── */}
-      <main className="flex-1 p-10 overflow-y-auto">
+      <main className="flex-1 px-6 py-8 md:p-10 lg:p-12 pb-32 lg:pb-12 overflow-y-auto">
         <AnimatePresence mode="wait">
           {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} yesterdayMeals={yesterdayMeals} historyMeals={historyMeals} suggestions={suggestions} coachInsights={coachInsights} goalLabel={goalLabel} activeProtocols={activeProtocols} protocolSummary={protocolSummary} onAddMeal={(item?: any) => { setPendingItem(item || null); setShowAddMeal(true); }} onToggleCoach={() => loadData()} setActiveTab={setActiveTab} onShowCoach={() => setShowCoachModal(true)} />}
 
@@ -317,8 +324,6 @@ export default function DashboardPage() {
           )}
 
           {activeTab === "community" && <CommunityTab key="community" userName={userName} />}
-
-
 
           {activeTab === "diet" && (
             <DietPlanTab 
@@ -343,7 +348,38 @@ export default function DashboardPage() {
         </AnimatePresence>
       </main>
 
-      {/* ─── ADD MEAL MODAL ──────────────────────────────────── */}
+      {/* ─── BOTTOM NAVIGATION (Mobile) ────────────────────────── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-black/80 backdrop-blur-3xl border-t border-white/5 px-4 pb-8 pt-4">
+        <div className="flex justify-between items-center max-w-md mx-auto">
+          {sidebarItems.slice(0, 5).map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all ${
+                activeTab === item.id ? 'text-emerald-400' : 'text-white/30'
+              }`}
+            >
+              <div className={activeTab === item.id ? 'scale-110' : ''}>
+                {item.icon}
+              </div>
+              <span className="text-[9px] font-bold tracking-tighter uppercase" style={{ fontFamily: 'var(--font-label)' }}>
+                {item.label === "Overview" ? "Home" : item.label.split(" ")[0]}
+              </span>
+            </button>
+          ))}
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all ${
+              activeTab === "settings" ? 'text-emerald-400' : 'text-white/30'
+            }`}
+          >
+            <Settings size={20} className={activeTab === "settings" ? 'scale-110' : ''} />
+            <span className="text-[9px] font-bold tracking-tighter uppercase" style={{ fontFamily: 'var(--font-label)' }}>Config</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ─── MODALS ────────────────────────────────────────── */}
       <AnimatePresence>
         {showAddMeal && (
           <AddMealModal 
@@ -399,31 +435,40 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, scale: 0.98 }}
-      className="space-y-16 pb-20"
+      className="space-y-10 md:space-y-16 pb-20"
     >
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-0">
         <div>
           <motion.p 
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            className="text-[10px] text-emerald-400/60 mb-4 tracking-[0.4em] font-black uppercase"
+            className="text-[10px] text-emerald-400/60 mb-2 md:mb-4 tracking-[0.4em] font-black uppercase"
           >
             System Status: {calPct > 95 ? "Physiological Equilibrium" : "Metabolic Sync Active"}
           </motion.p>
-          <h1 className="text-6xl font-black text-white tracking-tighter italic leading-none" style={{ fontFamily: 'var(--font-display)' }}>
-            {greeting()}, <span className="text-emerald-400">{userName.split(" ")[0]}</span>.
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter italic leading-none" style={{ fontFamily: 'var(--font-display)' }}>
+            {greeting()}, <br className="md:hidden" /> <span className="text-emerald-400">{userName.split(" ")[0]}</span>.
           </h1>
         </div>
-        <div className="flex gap-6 items-center">
-          <div className="text-right hidden md:block">
+        <div className="flex gap-4 items-center w-full md:w-auto">
+          <div className="text-right hidden sm:block">
             <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.3em] mb-1">Active Mandate</p>
-            <p className="text-sm font-black italic tracking-tight text-white/80">{currentProtocol ? currentProtocol.title : goalLabel(profile?.goalType || null)}</p>
+            <p className="text-xs md:text-sm font-black italic tracking-tight text-white/80">{currentProtocol ? currentProtocol.title : goalLabel(profile?.goalType || null)}</p>
           </div>
-          <button className="p-4 border border-white/5 hover:border-emerald-400/20 bg-white/[0.02] transition-all relative rounded-2xl group overflow-hidden">
-            <div className="absolute inset-0 bg-emerald-400/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
-            <Bell size={20} className="text-white/20 group-hover:text-emerald-400 transition-colors relative z-10" />
-            <div className="absolute top-3 right-3 w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-          </button>
+          <div className="flex gap-3 ml-auto md:ml-0">
+            <button 
+              onClick={() => logout()}
+              className="p-3.5 md:px-6 md:py-4 border border-white/5 hover:border-red-400/20 bg-white/[0.02] hover:bg-red-400/5 transition-all flex items-center gap-3 rounded-2xl group text-red-400/60 hover:text-red-400"
+            >
+              <LogOut size={18} />
+              <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest" style={{ fontFamily: 'var(--font-label)' }}>Terminate</span>
+            </button>
+            <button className="p-3.5 md:p-4 border border-white/5 hover:border-emerald-400/20 bg-white/[0.02] transition-all relative rounded-2xl group overflow-hidden">
+              <div className="absolute inset-0 bg-emerald-400/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+              <Bell size={20} className="text-white/20 group-hover:text-emerald-400 transition-colors relative z-10" />
+              <div className="absolute top-3 right-3 w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -431,38 +476,38 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
       <motion.div 
         whileHover={{ y: -4 }}
         onClick={onShowCoach}
-        className="p-[1px] bg-gradient-to-r from-emerald-500/20 via-white/5 to-emerald-500/20 rounded-[3rem] relative group/coach shadow-2xl cursor-pointer"
+        className="p-[1px] bg-gradient-to-r from-emerald-500/20 via-white/5 to-emerald-500/20 rounded-[2rem] md:rounded-[3rem] relative group/coach shadow-2xl cursor-pointer"
       >
-        <div className="bg-[#080808] rounded-[3rem] p-10 flex flex-col md:flex-row gap-10 items-center justify-between relative overflow-hidden">
+        <div className="bg-[#080808] rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 flex flex-col lg:flex-row gap-6 md:gap-10 items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover/coach:opacity-100 transition-opacity" />
-          <div className="flex gap-10 items-center relative z-10">
-            <div className={`p-6 rounded-[2rem] border transition-all duration-700 ${coachInsights?.enabled ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/5 text-white/20'}`}>
-               {coachInsights?.enabled ? <Activity size={40} strokeWidth={1.5} className="animate-pulse" /> : <Sparkles size={40} strokeWidth={1.5} />}
+          <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-center relative z-10 text-center md:text-left">
+            <div className={`p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border transition-all duration-700 ${coachInsights?.enabled ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/5 text-white/20'}`}>
+               {coachInsights?.enabled ? <Activity size={32} strokeWidth={1.5} className="w-8 h-8 md:w-10 md:h-10 animate-pulse" /> : <Sparkles size={32} strokeWidth={1.5} className="w-8 h-8 md:w-10 md:h-10" />}
             </div>
             <div className="max-w-xl">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-2xl font-black italic tracking-tighter text-white" style={{ fontFamily: 'var(--font-display)' }}>AI Nutrition Analyst</h3>
+              <div className="flex flex-col md:flex-row items-center gap-3 mb-2">
+                <h3 className="text-xl md:text-2xl font-black italic tracking-tighter text-white" style={{ fontFamily: 'var(--font-display)' }}>AI Nutrition Analyst</h3>
                 {coachInsights?.protocolActive && (
                   <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[8px] font-black text-emerald-400 uppercase tracking-widest">Protocol-Aware</span>
                 )}
               </div>
-              <p className="text-base font-medium text-white/50 leading-relaxed italic">
+              <p className="text-sm md:text-base font-medium text-white/50 leading-relaxed italic">
                 {coachInsights?.enabled 
                   ? coachInsights.data?.advice 
                   : "Sync the Nutrition Assistant to initiate metabolic tracking and algorithmic guidance."}
               </p>
             </div>
           </div>
-          <div className="flex flex-col gap-4 relative z-10 w-full md:w-64">
+          <div className="flex flex-col gap-4 relative z-10 w-full lg:w-64">
             {!coachInsights?.enabled ? (
               <button 
-                onClick={() => setActiveTab('settings')}
-                className="w-full py-5 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-400 hover:text-white transition-all shadow-xl"
+                onClick={(e) => { e.stopPropagation(); setActiveTab('settings'); }}
+                className="w-full py-4 md:py-5 bg-white text-black rounded-xl md:rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-400 hover:text-white transition-all shadow-xl"
               >Initialize Assistant</button>
             ) : (
-              <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl text-center backdrop-blur-md">
+              <div className="p-4 md:p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl md:rounded-3xl text-center backdrop-blur-md">
                  <p className="text-[9px] font-black uppercase tracking-[0.4em] text-emerald-400/40 mb-2">Optimization Vector</p>
-                 <p className="text-xl font-black italic tracking-tighter text-emerald-400">
+                 <p className="text-lg md:text-xl font-black italic tracking-tighter text-emerald-400">
                    {coachInsights.data?.suggestion 
                      ? `+${coachInsights.data.suggestion.amount}${coachInsights.data.suggestion.unit} ${coachInsights.data.suggestion.type.toUpperCase()}`
                      : "NEUTRAL BALANCE"}
@@ -475,7 +520,7 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
 
 
       {/* MACRO HUD: Precision Nutrition HUD */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
         {[
           { label: "Caloric Intake", value: calCurrent.toLocaleString(), sub: `Target ${calTarget.toLocaleString()}`, icon: <Flame size={20}/>, pct: calPct, color: "from-emerald-400 to-emerald-600", glow: "shadow-emerald-500/20" },
           { label: "Protein Availability", value: `${proteinCurrent}g`, sub: `Limit ${proteinTarget}g`, icon: <Zap size={20}/>, pct: proteinPct, color: "from-blue-400 to-blue-600", glow: "shadow-blue-500/20" },
@@ -485,16 +530,16 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
           <GlassTilt key={i} intensity={10}>
             <motion.div 
               whileHover={{ y: -4 }}
-              className="p-10 border border-white/5 bg-white/[0.02] backdrop-blur-3xl hover:bg-white/[0.05] transition-all group rounded-[3rem] relative overflow-hidden"
+              className="p-8 md:p-10 border border-white/5 bg-white/[0.02] backdrop-blur-3xl hover:bg-white/[0.05] transition-all group rounded-[2.5rem] md:rounded-[3rem] relative overflow-hidden"
             >
-              <div className="flex justify-between items-start mb-10">
+              <div className="flex justify-between items-start mb-8 md:mb-10">
                 <span className="text-[9px] tracking-[0.4em] text-white/20 uppercase font-black" style={{ fontFamily: 'var(--font-label)' }}>{stat.label}</span>
-                <div className="p-3 border border-white/5 group-hover:border-white/20 transition-colors rounded-2xl text-white/30 group-hover:text-white">
+                <div className="p-2.5 md:p-3 border border-white/5 group-hover:border-white/20 transition-colors rounded-xl md:rounded-2xl text-white/30 group-hover:text-white">
                   {stat.icon}
                 </div>
               </div>
-              <div className="flex flex-col mb-10">
-                <span className="text-5xl font-black italic tracking-tighter text-liquid mb-2" style={{ fontFamily: 'var(--font-display)' }}>{stat.value}</span>
+              <div className="flex flex-col mb-8 md:mb-10">
+                <span className="text-4xl md:text-5xl font-black italic tracking-tighter text-liquid mb-2" style={{ fontFamily: 'var(--font-display)' }}>{stat.value}</span>
                 <span className="text-[9px] text-white/10 font-black uppercase tracking-[0.3em] font-bold">{stat.sub}</span>
               </div>
               <div className="h-[4px] w-full bg-white/5 overflow-hidden rounded-full">
@@ -512,35 +557,35 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         {/* BIOMETRIC ANALYTICS */}
-        <div className="lg:col-span-12 border border-white/5 p-12 bg-white/[0.01] rounded-[4rem] relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+        <div className="lg:col-span-12 border border-white/5 p-8 md:p-12 bg-white/[0.01] rounded-[2.5rem] md:rounded-[4rem] relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none hidden md:block">
             <LayoutDashboard size={300} strokeWidth={0.5} />
           </div>
           
-          <div className="flex justify-between items-start mb-16 relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start mb-12 md:mb-16 relative z-10 gap-6 md:gap-0">
             <div>
-              <h3 className="text-3xl font-black italic tracking-tighter text-white leading-none" style={{ fontFamily: 'var(--font-display)' }}>Biometric Analytics</h3>
+              <h3 className="text-2xl md:text-3xl font-black italic tracking-tighter text-white leading-none" style={{ fontFamily: 'var(--font-display)' }}>Biometric Analytics</h3>
               <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.4em] mt-4">Metabolic Flux Spectrum</p>
             </div>
-            <div className="flex gap-4">
-               <div className="flex items-center gap-3 px-6 py-2.5 border border-white/5 bg-white/[0.02] rounded-2xl">
+            <div className="flex gap-4 w-full md:w-auto">
+               <div className="flex items-center gap-3 px-5 py-2.5 border border-white/5 bg-white/[0.02] rounded-xl md:rounded-2xl w-full md:w-auto overflow-hidden">
                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Efficiency Vector</span>
+                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 whitespace-nowrap">Efficiency Vector</span>
                </div>
             </div>
           </div>
           
-          <div className="h-[400px] w-full relative z-10">
+          <div className="h-[250px] md:h-[400px] w-full relative z-10">
             {!yesterdayData || yesterdayData.length === 0 ? (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-white/[0.02] border border-white/5 rounded-[2rem]">
-                <div className="w-48 h-[1px] bg-white/5 relative overflow-hidden">
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-white/[0.02] border border-white/5 rounded-[1.5rem] md:rounded-[2rem]">
+                <div className="w-32 md:w-48 h-[1px] bg-white/5 relative overflow-hidden">
                   <motion.div 
                     animate={{ x: ["-100%", "100%"] }} 
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                     className="absolute inset-0 bg-emerald-400/20"
                   />
                 </div>
-                <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">Awaiting Biometric Data Stream...</span>
+                <span className="text-[9px] md:text-[10px] text-white/20 font-black uppercase tracking-widest text-center px-4">Awaiting Biometric Data Stream...</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -555,13 +600,13 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
                   <XAxis dataKey="name" stroke="none" tick={{ fill: '#ffffff15', fontSize: 10, fontWeight: 900 }} dy={20} />
                   <YAxis stroke="none" tick={{ fill: '#ffffff15', fontSize: 10, fontWeight: 900 }} dx={-20} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#050505', border: '1px solid #ffffff10', borderRadius: '24px', backdropFilter: 'blur(40px)', padding: '20px' }}
-                    itemStyle={{ color: '#10b981', fontSize: '13px', fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.02em' }}
-                    labelStyle={{ color: '#ffffff30', fontSize: '10px', fontWeight: 900, letterSpacing: '0.2em', marginBottom: '8px' }}
+                    contentStyle={{ backgroundColor: '#050505', border: '1px solid #ffffff10', borderRadius: '16px', backdropFilter: 'blur(40px)', padding: '15px' }}
+                    itemStyle={{ color: '#10b981', fontSize: '11px', fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.02em' }}
+                    labelStyle={{ color: '#ffffff30', fontSize: '9px', fontWeight: 900, letterSpacing: '0.2em', marginBottom: '8px' }}
                     cursor={{ stroke: '#ffffff10', strokeWidth: 2 }}
                   />
 
-                  <Area type="monotone" dataKey="calories" stroke="#10b981" fillOpacity={1} fill="url(#colorCal)" strokeWidth={5} animationDuration={3000} />
+                  <Area type="monotone" dataKey="calories" stroke="#10b981" fillOpacity={1} fill="url(#colorCal)" strokeWidth={4} animationDuration={3000} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -595,49 +640,49 @@ function DietPlanTab({ profile, goalLabel, activeProtocols, todayMeals, yesterda
       exit={{ opacity: 0, scale: 0.98 }} 
       className="space-y-16"
     >
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-0">
         <div>
-          <h2 className="text-6xl font-black italic tracking-tighter mb-4" style={{ fontFamily: 'var(--font-display)' }}>Nutritional Mandate</h2>
-          <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.4em]">Current Strategy: {currentProtocol ? currentProtocol.title : goalLabel(profile?.goalType)} · {profile?.dietPreference?.toUpperCase()}</p>
+          <h2 className="text-3xl md:text-5xl lg:text-6xl font-black italic tracking-tighter mb-2 md:mb-4" style={{ fontFamily: 'var(--font-display)' }}>Nutritional Mandate</h2>
+          <p className="text-[9px] md:text-[10px] text-emerald-400 font-black uppercase tracking-[0.3em] md:tracking-[0.4em]">Current Strategy: <br className="sm:hidden" /> {currentProtocol ? currentProtocol.title : goalLabel(profile?.goalType)} · {profile?.dietPreference?.toUpperCase()}</p>
         </div>
       </header>
 
       {/* NEURAL HUD: Circular Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-8 space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-8 space-y-8 md:space-y-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {targets.map((t, i) => (
               <motion.div 
                 key={i} 
                 whileHover={{ y: -8 }}
-                className={`p-10 bg-white/[0.01] border border-white/5 hover:border-white/10 rounded-[3rem] relative group overflow-hidden transition-all`}
+                className={`p-8 md:p-10 bg-white/[0.01] border border-white/5 hover:border-white/10 rounded-[2.5rem] md:rounded-[3rem] relative group overflow-hidden transition-all`}
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${t.color} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
                 <div className="relative z-10">
-                  <div className="flex justify-between items-center mb-10">
+                  <div className="flex justify-between items-center mb-8 md:mb-10">
                     <p className="text-[9px] uppercase font-black tracking-[0.4em] text-white/20 group-hover:text-white/40 transition-colors">{t.label}</p>
                     <div className="text-white/20 group-hover:text-white/60 transition-colors">{t.icon}</div>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black italic tracking-tighter leading-none text-white">{t.value}</span>
-                    <span className="text-[10px] font-black text-white/10 uppercase tracking-widest">{t.unit}</span>
+                    <span className="text-3xl md:text-4xl font-black italic tracking-tighter leading-none text-white">{t.value}</span>
+                    <span className="text-[9px] md:text-[10px] font-black text-white/10 uppercase tracking-widest">{t.unit}</span>
                   </div>
                 </div>
               </motion.div>
             ))}
           </div>
 
-          <div className="p-[1px] bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-[3.5rem] shadow-2xl relative group overflow-hidden">
+          <div className="p-[1px] bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-[2.5rem] md:rounded-[3.5rem] shadow-2xl relative group overflow-hidden">
             <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="bg-[#080808] p-12 lg:p-16 rounded-[3.5rem] relative z-10">
-              <div className="flex items-center gap-8 mb-10">
-                <div className="p-5 bg-white/[0.03] border border-white/5 text-emerald-400 rounded-3xl shadow-2xl"><Target size={32} strokeWidth={1.5}/></div>
+            <div className="bg-[#080808] p-8 md:p-12 lg:p-16 rounded-[2.5rem] md:rounded-[3.5rem] relative z-10">
+              <div className="flex items-center gap-6 md:gap-8 mb-8 md:mb-10 text-center md:text-left">
+                <div className="p-4 md:p-5 bg-white/[0.03] border border-white/5 text-emerald-400 rounded-2xl md:rounded-3xl shadow-2xl"><Target size={28} className="w-7 h-7 md:w-8 md:h-8" strokeWidth={1.5}/></div>
                 <div>
-                  <h3 className="text-3xl font-black italic tracking-tighter">Strategic Alignment</h3>
-                  <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.3em] mt-2">Protocol Efficiency: <span className="text-emerald-400">94.2% Accurate</span></p>
+                  <h3 className="text-2xl md:text-3xl font-black italic tracking-tighter">Strategic Alignment</h3>
+                  <p className="text-[9px] md:text-[10px] text-white/20 font-black uppercase tracking-[0.3em] mt-2">Protocol Efficiency: <span className="text-emerald-400">94.2% Accurate</span></p>
                 </div>
               </div>
-              <p className="max-w-4xl text-2xl text-white/40 leading-tight font-medium italic tracking-tight">
+              <p className="max-w-4xl text-lg md:text-xl lg:text-2xl text-white/40 leading-tight font-medium italic tracking-tight">
                 "Your physiological profile indicates a shift towards <span className="text-white">optimized metabolic flexibility</span>. By prioritizing <span className="text-white">bioavailable amino acids</span> and maintaining a surgical <span className="text-white">carbohydrate cycle</span>, we are locking into a verified metabolic state aligned with the <span className="text-emerald-400">{goalLabel(profile?.goalType)}</span> directive."
               </p>
             </div>
@@ -645,14 +690,14 @@ function DietPlanTab({ profile, goalLabel, activeProtocols, todayMeals, yesterda
         </div>
 
         {/* METABOLIC TIMELINE */}
-        <div className="lg:col-span-4 border border-white/5 p-12 bg-white/[0.01] rounded-[4rem] flex flex-col relative overflow-hidden h-[700px]">
-          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+        <div className="lg:col-span-4 border border-white/5 p-8 md:p-12 bg-white/[0.01] rounded-[2.5rem] md:rounded-[4rem] flex flex-col relative overflow-hidden h-[500px] md:h-[700px]">
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none hidden md:block">
             <Activity size={300} strokeWidth={0.5} />
           </div>
           
-          <div className="mb-12 relative z-10 text-center">
-             <div className="relative inline-block w-40 h-40 mb-8">
-                <svg className="w-full h-full transform -rotate-90">
+          <div className="mb-8 md:mb-12 relative z-10 text-center">
+             <div className="relative inline-block w-32 h-32 md:w-40 md:h-40 mb-6 md:mb-8">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
                   <circle cx="80" cy="80" r="70" fill="transparent" stroke="#ffffff08" strokeWidth="8" />
                   <motion.circle 
                     cx="80" cy="80" r="70" fill="transparent" stroke="#10b981" strokeWidth="8" 
@@ -664,15 +709,15 @@ function DietPlanTab({ profile, goalLabel, activeProtocols, todayMeals, yesterda
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                   <p className="text-3xl font-black italic tracking-tighter text-white leading-none">{calPct}%</p>
-                   <p className="text-[8px] text-white/20 font-black uppercase tracking-widest mt-1">Metabolic CAP</p>
+                   <p className="text-2xl md:text-3xl font-black italic tracking-tighter text-white leading-none">{calPct}%</p>
+                   <p className="text-[7px] md:text-[8px] text-white/20 font-black uppercase tracking-widest mt-1">CAPACITY</p>
                 </div>
              </div>
-             <h3 className="text-2xl font-black italic tracking-tighter text-white">Metabolic Timeline</h3>
+             <h3 className="text-xl md:text-2xl font-black italic tracking-tighter text-white">Metabolic Timeline</h3>
              <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.4em] mt-2">Active Intake Stream</p>
           </div>
 
-          <div className="flex-1 space-y-10 overflow-y-auto overscroll-contain pr-2 custom-scrollbar relative z-10 px-2">
+          <div className="flex-1 space-y-6 md:space-y-10 overflow-y-auto overscroll-contain pr-2 custom-scrollbar relative z-10 px-2">
             {todayMeals.length === 0 ? (
                 <div className="p-10 border border-dashed border-white/5 rounded-[2.5rem] text-center bg-white/[0.01]">
                   <p className="text-xs text-white/10 font-black italic tracking-tight uppercase">Ready for Input</p>

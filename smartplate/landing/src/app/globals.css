@@ -15,6 +15,10 @@
   --color-text-muted: #4a665a;
   --color-border: rgba(16, 185, 129, 0.12);
 
+  /* Responsive Spacing Tokens */
+  --mobile-px: 1.5rem;
+  --desktop-px: 2.5rem;
+
   --font-display: 'Outfit', sans-serif;
   --font-body: 'DM Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;

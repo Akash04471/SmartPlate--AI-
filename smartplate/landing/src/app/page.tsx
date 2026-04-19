@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useScroll, useTransform, motion, type MotionValue, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { Brain, ScanLine, TrendingUp, Trophy, ArrowRight, Star, Camera, Utensils, BarChart3, MessageCircle, Sparkles, Shield } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -16,6 +17,8 @@ import MetabolicRuler from "@/components/MetabolicRuler";
 import HorizontalProtocol from "@/components/HorizontalProtocol";
 import VisualIntelligence from "@/components/VisualIntelligence";
 import InteractiveMacroProfiler from "@/components/InteractiveMacroProfiler";
+import DietPlansSection from "@/components/DietPlansSection";
+import RewardsSection from "@/components/RewardsSection";
 import {
   features,
   testimonials,
@@ -73,10 +76,10 @@ function TextVelocityMarquee() {
       <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#031810] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#031810] to-transparent z-10 pointer-events-none" />
       <div className="marquee-track px-4">
-        <span className="text-[10vw] md:text-[6vw] font-black tracking-tighter text-emerald-400/[0.08] whitespace-nowrap uppercase italic" style={{ fontFamily: 'var(--font-display)', filter: 'blur(1px)' }}>
+        <span className="text-[12vw] sm:text-[10vw] md:text-[6vw] font-black tracking-tighter text-emerald-400/[0.08] whitespace-nowrap uppercase italic" style={{ fontFamily: 'var(--font-display)', filter: 'blur(1px)' }}>
           {repeated}
         </span>
-        <span className="text-[10vw] md:text-[6vw] font-black tracking-tighter text-white/[0.12] whitespace-nowrap uppercase italic ml-20" style={{ fontFamily: 'var(--font-display)' }}>
+        <span className="text-[12vw] sm:text-[10vw] md:text-[6vw] font-black tracking-tighter text-white/[0.12] whitespace-nowrap uppercase italic ml-20" style={{ fontFamily: 'var(--font-display)' }}>
           {repeated}
         </span>
       </div>
@@ -181,11 +184,11 @@ function DashboardShowcase() {
       <div className="sticky top-0 h-screen flex items-center overflow-hidden">
         <div className="max-w-[1400px] mx-auto px-10 w-full">
           {/* Section Header */}
-          <div className="mb-16">
+          <div className="mb-12 md:mb-16">
             <span className="text-[10px] text-white/30 tracking-[0.3em] font-semibold uppercase block mb-4" style={{ fontFamily: 'var(--font-label)' }}>
               Dashboard Features
             </span>
-            <h2 className="heading-display text-5xl md:text-7xl text-white">
+            <h2 className="heading-display text-4xl md:text-5xl lg:text-7xl text-white">
               <WordReveal text="Your nutrition cockpit." />
             </h2>
           </div>
@@ -200,26 +203,26 @@ function DashboardShowcase() {
                   return (
                     <motion.div
                       key={i}
-                      className="obsidian-card p-14"
+                      className="obsidian-card p-10 md:p-14"
                       initial={{ opacity: 0, y: 40, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -30, scale: 0.96 }}
                       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     >
-                      <div className="flex items-center gap-5 mb-10">
+                      <div className="flex items-center gap-5 mb-8 md:mb-10">
                         <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `${feat.color}15`, border: `1px solid ${feat.color}30` }}>
                           <Icon size={22} style={{ color: feat.color }} />
                         </div>
                         <div>
                           <div className="text-[10px] text-white/30 tracking-widest font-semibold uppercase" style={{ fontFamily: 'var(--font-label)' }}>{feat.subtitle}</div>
-                          <h3 className="heading-display text-3xl text-white">{feat.title}</h3>
+                          <h3 className="heading-display text-2xl md:text-3xl text-white">{feat.title}</h3>
                         </div>
                       </div>
-                      <p className="body-refined text-white/50 text-lg leading-relaxed mb-12">
+                      <p className="body-refined text-white/50 text-base md:text-lg leading-relaxed mb-10 md:mb-12">
                         {feat.description}
                       </p>
                       <div className="flex items-end gap-3 pt-8 border-t border-white/5">
-                        <span className="text-5xl font-bold tracking-tighter" style={{ fontFamily: 'var(--font-display)', color: feat.color }}>{feat.metric}</span>
+                        <span className="text-4xl md:text-5xl font-bold tracking-tighter" style={{ fontFamily: 'var(--font-display)', color: feat.color }}>{feat.metric}</span>
                         <span className="text-[10px] text-white/30 font-semibold tracking-wider uppercase pb-2" style={{ fontFamily: 'var(--font-label)' }}>{feat.metricLabel}</span>
                       </div>
                     </motion.div>
@@ -393,19 +396,19 @@ const howItWorksSteps = [
 
 function HowItWorks() {
   return (
-    <div className="py-24 md:py-32 relative">
+    <div className="py-16 md:py-24 relative border-t border-white/5">
       <div className="max-w-[1400px] mx-auto px-10">
-        <div className="text-center mb-32">
+        <div className="text-center mb-20 md:mb-28">
           <span className="text-[10px] text-white/30 tracking-[0.3em] font-semibold uppercase block mb-6" style={{ fontFamily: 'var(--font-label)' }}>
             How It Works
           </span>
-          <h2 className="heading-display text-6xl md:text-8xl text-white mb-8">
+          <h2 className="heading-display text-4xl md:text-5xl lg:text-7xl text-white mb-6">
             <WordReveal text="Four steps to" />
             <br />
             <WordReveal text="transformation." delay={0.25} />
           </h2>
           <motion.p
-            className="body-refined text-white/35 text-xl max-w-2xl mx-auto"
+            className="body-refined text-white/35 text-lg md:text-xl max-w-2xl mx-auto"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
@@ -415,20 +418,20 @@ function HowItWorks() {
           </motion.p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0">
           {howItWorksSteps.map((item, i) => {
             const Icon = item.icon;
             return (
               <motion.div
                 key={i}
-                className="relative p-10 border border-white/[0.04] group hover:bg-white/[0.02] transition-all duration-700"
+                className="relative p-8 md:p-10 border border-white/[0.04] group hover:bg-white/[0.02] transition-all duration-700"
                 initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               >
                 {/* Step Number */}
-                <span className="text-7xl font-bold text-white/[0.03] absolute top-6 right-6" style={{ fontFamily: 'var(--font-display)' }}>
+                <span className="text-5xl md:text-7xl font-bold text-white/[0.03] absolute top-6 right-6" style={{ fontFamily: 'var(--font-display)' }}>
                   {item.step}
                 </span>
 
@@ -438,11 +441,11 @@ function HowItWorks() {
                 )}
 
                 <div className="relative z-10">
-                  <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-8 group-hover:border-emerald-500/30 transition-colors duration-500">
+                  <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-6 md:mb-8 group-hover:border-emerald-500/30 transition-colors duration-500">
                     <Icon size={20} className="text-white/40 group-hover:text-emerald-400 transition-colors duration-500" />
                   </div>
-                  <h3 className="heading-display text-2xl mb-4 text-white">{item.title}</h3>
-                  <p className="body-refined text-white/35 text-sm leading-relaxed mb-8">
+                  <h3 className="heading-display text-xl md:text-2xl mb-4 text-white">{item.title}</h3>
+                  <p className="body-refined text-white/35 text-xs md:text-sm leading-relaxed mb-6 md:mb-8">
                     {item.description}
                   </p>
                   <span className="text-[9px] text-emerald-400/50 font-bold tracking-widest uppercase" style={{ fontFamily: 'var(--font-label)' }}>
@@ -477,10 +480,10 @@ function InteractiveFeatureCard({ feat, index }: { feat: (typeof features)[numbe
   return (
     <motion.div
       ref={cardRef}
-      className="obsidian-card p-12 group min-h-[420px]"
-      initial={{ opacity: 0, y: 60 + parallaxOffset }}
+      className="obsidian-card p-10 md:p-12 group min-h-[auto] md:min-h-[420px]"
+      initial={{ opacity: 0, y: 40 + parallaxOffset }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
+      viewport={{ once: true, margin: "-20px" }}
       transition={{ duration: 1.2, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
       onMouseMove={handleMouseMove}
     >
@@ -556,8 +559,10 @@ export default function Home() {
     target: sequenceRef,
     offset: ["start start", "end end"],
   });
+  const { scrollYProgress: globalScroll } = useScroll();
 
   const canvasProgress = useTransform(scrollYProgress, [0, 1], [0, 1]);
+  const globalProgress = useTransform(globalScroll, [0, 1], [0, 1]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -580,7 +585,9 @@ export default function Home() {
       
       {!isLoading && (
         <div className="fixed top-20 left-0 right-0 z-[120] px-6 pointer-events-none">
-          <CanvasRuler progress={canvasProgress} />
+          <div className="pointer-events-auto max-w-[1400px] mx-auto">
+            <CanvasRuler progress={globalProgress} />
+          </div>
         </div>
       )}
 
@@ -610,9 +617,9 @@ export default function Home() {
                 <span className="text-[10px] tracking-wider font-semibold text-white/40" style={{ fontFamily: 'var(--font-label)' }}>EST. 2026</span>
               </div>
               
-              <h1 className="heading-display !text-[clamp(3.5rem,10vw,12rem)] mb-8 leading-[0.85] text-liquid whitespace-nowrap">
+              <h1 className="heading-display !text-[clamp(1.8rem,8vw,12rem)] md:!text-[clamp(3.5rem,10vw,12rem)] mb-6 md:mb-8 leading-[0.85] text-liquid whitespace-normal sm:whitespace-nowrap px-4">
                 {Array.from("Eat Smarter").map((char, i) => (
-                    <span key={i} style={{ animationDelay: `${i * 0.04}s` }}>{char === " " ? "\u00A0" : char}</span>
+                    <span key={i} className="inline-block" style={{ animationDelay: `${i * 0.04}s` }}>{char === " " ? "\u00A0" : char}</span>
                 ))}
               </h1>
 
@@ -701,7 +708,7 @@ export default function Home() {
           {/* ─── HOW IT WORKS ─────────────────────────────────────── */}
           <HowItWorks />
 
-          {/* ─── INTERACTIVE EXPERIENCE (Gaps filled) ──────────────── */}
+          {/* ─── INTERACTIVE EXPERIENCE ────────────────────────────── */}
           <InteractiveMacroProfiler />
 
           {/* ─── VISUAL INTELLIGENCE (Scrollytelling) ─────────────── */}
@@ -712,11 +719,17 @@ export default function Home() {
             <DashboardShowcase />
           </div>
 
+          {/* ─── DIET PLANS ────────────────────────────────────────── */}
+          <DietPlansSection />
+
           {/* Horizontal Protocol Section */}
           <HorizontalProtocol />
 
+          {/* ─── REWARDS ───────────────────────────────────────────── */}
+          <RewardsSection />
+
           {/* Features Grid */}
-          <div id="features" className="py-24 md:py-32 relative border-t border-white/5">
+          <div id="features" className="py-16 md:py-24 relative border-t border-white/5">
             <div className="max-w-[1400px] mx-auto px-10">
               <div className="flex flex-col lg:flex-row gap-24 items-start mb-32">
                  <div className="flex-1">
@@ -864,7 +877,13 @@ export default function Home() {
             <div className="max-w-[1400px] mx-auto px-10">
                <div className="grid lg:grid-cols-12 gap-24 pb-32 mb-16">
                  <div className="lg:col-span-5">
-                   <h2 className="heading-display text-4xl mb-8 text-white">SmartPlate</h2>
+                   <Image 
+                     src="/images/smartplate-logo.jpg" 
+                     alt="SmartPlate Logo" 
+                     width={180} 
+                     height={60}
+                     className="w-44 h-auto object-contain mb-8"
+                   />
                    <p className="body-refined text-white/30 text-base max-w-md mb-12">
                      The intelligent nutrition platform that combines AI meal tracking, personalized diet plans, and real-time coaching to help you achieve your health goals.
                    </p>

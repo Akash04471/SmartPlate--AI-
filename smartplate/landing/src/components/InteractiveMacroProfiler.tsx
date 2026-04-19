@@ -24,7 +24,7 @@ export default function InteractiveMacroProfiler() {
   ];
 
   return (
-    <section className="py-40 relative overflow-hidden bg-base-dark">
+    <section className="py-28 relative overflow-hidden bg-base-dark">
       <div className="max-w-[1400px] mx-auto px-10">
         <div className="flex flex-col lg:flex-row gap-20 items-center">
           <div className="flex-1">

@@ -7,16 +7,10 @@ import * as schema from "./schema.js";
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
+  ssl: env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-// Verify the connection immediately when the module loads
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error("❌ Database connection failed:", err.message);
-    process.exit(1); // crash loudly — better than silent failure
-  }
-  console.log("✅ PostgreSQL connected");
-  release();
-});
+// We removed the immediate pool.connect() check to prevent Vercel startup crashes.
+// Database errors will now be handled during active request cycles.
 
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool, { schema });

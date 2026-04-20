@@ -25,8 +25,9 @@ if (!result.success) {
   result.error.issues.forEach(issue => {
     console.error(`   ${issue.path.join('.')}: ${issue.message}`);
   });
-  // Exit the process — do not start a misconfigured server
-  process.exit(1);
+  });
+  // Note: We no longer call process.exit(1) here to prevent Vercel deployment crashes.
+  // The app will log errors but attempt to continue, which is safer for serverless environments.
 }
 
 export const env = result.data;

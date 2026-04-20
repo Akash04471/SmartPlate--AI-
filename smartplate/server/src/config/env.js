@@ -25,9 +25,9 @@ if (!result.success) {
   result.error.issues.forEach(issue => {
     console.error(`   ${issue.path.join('.')}: ${issue.message}`);
   });
-  });
   // Note: We no longer call process.exit(1) here to prevent Vercel deployment crashes.
   // The app will log errors but attempt to continue, which is safer for serverless environments.
 }
 
-export const env = result.data;
+// Export the parsed data if successful, otherwise fallback to process.env to avoid immediate crashes
+export const env = result.success ? result.data : process.env;

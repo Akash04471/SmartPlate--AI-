@@ -71,6 +71,11 @@ export async function signup(req, res, next) {
     });
 
   } catch (err) {
+    console.error("❌ SIGNUP_DB_ERROR:", {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+    });
     next(err);
   }
 }

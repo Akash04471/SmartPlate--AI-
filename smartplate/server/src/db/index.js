@@ -5,12 +5,16 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { env } from '../config/env.js';
 import * as schema from "./schema.js";
 
+const connectionString = (env.DATABASE_URL || "").trim();
+
 export const pool = new pg.Pool({
-  connectionString: env.DATABASE_URL,
-  ssl: env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-  max: 10, // Limit connections for serverless
+  connectionString,
+  ssl: connectionString.includes('supabase.co') || env.NODE_ENV === "production" 
+    ? { rejectUnauthorized: false } 
+    : false,
+  max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
 });
 
 pool.on('error', (err) => {

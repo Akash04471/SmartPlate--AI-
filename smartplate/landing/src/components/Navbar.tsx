@@ -31,11 +31,11 @@ export default function Navbar() {
     return (
         <>
             <motion.nav
-                className={`fixed top-0 left-0 right-0 z-[100] px-6 md:px-12 py-6 flex items-center justify-between transition-all duration-300 ${scrolled
+                className={`fixed top-0 left-0 right-0 z-[100] px-6 md:px-12 py-3 flex items-center justify-between transition-all duration-300 ${scrolled
                         ? "backdrop-blur-xl bg-base-dark/80 border-b border-border"
                         : "bg-transparent"
                     }`}
-                initial={{ y: -80, opacity: 0 }}
+                initial={{ y: -60, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
             >

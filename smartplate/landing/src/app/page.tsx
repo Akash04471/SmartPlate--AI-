@@ -584,7 +584,7 @@ export default function Home() {
       </AnimatePresence>
       
       {!isLoading && (
-        <div className="fixed top-20 left-0 right-0 z-[120] px-6 pointer-events-none">
+        <div className="fixed top-16 left-0 right-0 z-[120] px-6 pointer-events-none">
           <div className="pointer-events-auto max-w-[1400px] mx-auto">
             <CanvasRuler progress={globalProgress} />
           </div>
@@ -656,7 +656,7 @@ export default function Home() {
           <FoodParticles count={8} />
 
           {/* Stats Bar */}
-          <div className="py-20 border-y border-white/5 bg-base-dark2/50 backdrop-blur-3xl relative overflow-hidden">
+          <div className="pt-32 pb-20 border-y border-white/5 bg-base-dark2/50 backdrop-blur-3xl relative overflow-hidden">
             {/* Background Neural pulse */}
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.03] via-transparent to-emerald-500/[0.03] pointer-events-none" />
             <div className="max-w-[1400px] mx-auto px-10">

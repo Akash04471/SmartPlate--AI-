@@ -66,6 +66,8 @@ app.use((err, req, res, next) => {
   const status = err.statusCode || 500;
   res.status(status).json({
     error: err.message || 'Internal server error',
+    code: err.code, // Helpful for Postgres errors (e.g., '42P01')
+    detail: err.detail, // Detailed Postgres error if available
   });
 });
 

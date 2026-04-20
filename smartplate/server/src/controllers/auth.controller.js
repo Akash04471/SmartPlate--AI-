@@ -1,5 +1,5 @@
 // ✅ auth.controller.js — Updated with OTP & 2FA
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";

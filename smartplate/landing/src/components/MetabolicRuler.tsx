@@ -32,27 +32,26 @@ export default function MetabolicRuler({
   const percentage = Math.min(100, Math.max(0, (value / max) * 100));
 
   return (
-    <div className="relative w-full py-6 group select-none">
+    <div className="relative w-full py-1 group select-none">
       {/* Header Info */}
-      <div className="flex justify-between items-end mb-4 px-2">
+      <div className="flex justify-between items-center mb-1 px-4">
         <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500/40">Metabolic HUD</span>
-          <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest mt-1">Precision scroll tracking active</span>
+          <span className="text-[8px] font-black uppercase tracking-[0.4em] text-emerald-500/40">HUD v.02</span>
         </div>
         <div className="flex items-baseline gap-2">
           <motion.span 
-            className="text-4xl font-black italic tracking-tighter text-white"
+            className="text-2xl font-black italic tracking-tighter text-white"
             style={{ fontVariantNumeric: "tabular-nums" }}
           >
             {value}
           </motion.span>
-          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{unit}</span>
+          <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest">{unit}</span>
         </div>
       </div>
 
       <div 
         ref={containerRef}
-        className="relative h-24 bg-gradient-to-b from-white/[0.03] to-transparent border border-white/10 rounded-2xl overflow-hidden flex items-center shadow-2xl backdrop-blur-xl"
+        className="relative h-12 bg-gradient-to-b from-white/[0.03] to-transparent border border-white/5 rounded-xl overflow-hidden flex items-center shadow-lg backdrop-blur-md"
       >
         {/* Progress Background Fill */}
         <motion.div 
@@ -62,7 +61,7 @@ export default function MetabolicRuler({
         />
 
         {/* Static Scale / Ticks */}
-        <div className="absolute inset-0 flex justify-between items-center px-8 md:px-12 pointer-events-none opacity-40">
+        <div className="absolute inset-0 flex justify-between items-center px-8 md:px-12 pointer-events-none opacity-30">
           {ticks.map((t) => {
             const isMajor = t % 10 === 0;
             const isMid = t % 5 === 0;
@@ -70,14 +69,9 @@ export default function MetabolicRuler({
               <div key={t} className="flex flex-col items-center">
                 <div 
                   className={`w-[1px] transition-colors duration-500 ${
-                    isMajor ? 'h-8 bg-white/60' : isMid ? 'h-5 bg-white/30' : 'h-3 bg-white/10'
+                    isMajor ? 'h-6 bg-white/60' : isMid ? 'h-4 bg-white/30' : 'h-2 bg-white/10'
                   }`} 
                 />
-                {isMajor && (
-                  <span className="text-[8px] font-bold text-white/20 absolute -bottom-6">
-                    {Math.round((t / totalTicks) * max)}
-                  </span>
-                )}
               </div>
             );
           })}
@@ -91,23 +85,23 @@ export default function MetabolicRuler({
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
           {/* Needle Graphic */}
-          <div className="w-[2px] h-12 bg-emerald-500 rounded-full shadow-[0_0_20px_rgba(16,185,129,1)] relative">
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-emerald-500 rounded-full blur-[4px]" />
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-emerald-500 rounded-full blur-[4px]" />
+          <div className="w-[1px] h-8 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.8)] relative">
+            <div className="absolute -top-0.5 left-1/2 -track-x-1/2 w-2 h-2 bg-emerald-500 rounded-full blur-[2px]" />
+            <div className="absolute -bottom-0.5 left-1/2 -track-x-1/2 w-2 h-2 bg-emerald-500 rounded-full blur-[2px]" />
             
-            {/* Value Tooltip attached to needle */}
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-emerald-500 text-black text-[9px] font-black px-2 py-1 rounded-sm whitespace-nowrap">
+            {/* Value Tooltip attached to needle - smaller and more subtle */}
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-emerald-500 text-black text-[7px] font-black px-1.5 py-0.5 rounded-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
                {value} {unit}
             </div>
           </div>
           
           {/* Dynamic Glow */}
-          <div className="absolute inset-0 w-8 h-full -left-3 bg-emerald-500/20 blur-xl opacity-50" />
+          <div className="absolute inset-0 w-6 h-full -left-2.5 bg-emerald-500/10 blur-xl opacity-40" />
         </motion.div>
 
         {/* HUD UI Elements */}
-        <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-base-dark to-transparent z-10 pointer-events-none md:block hidden" />
-        <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-base-dark to-transparent z-10 pointer-events-none md:block hidden" />
+        <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-black/20 to-transparent z-10 pointer-events-none" />
         
         {/* Interaction Scrubbing Layer */}
         <input
@@ -119,18 +113,6 @@ export default function MetabolicRuler({
           onChange={(e) => onChange(parseFloat(e.target.value))}
           className="w-full h-full opacity-0 absolute inset-0 z-40 cursor-ew-resize"
         />
-      </div>
-      
-      {/* Footer Markers */}
-      <div className="flex justify-between mt-8 px-2">
-        <span className="text-[8px] font-black text-white/10 uppercase tracking-[0.4em]">Baseline Vector</span>
-        <div className="flex gap-6">
-           <div className="flex items-center gap-2">
-             <div className="w-1 h-1 rounded-full bg-emerald-500 animate-ping" />
-             <span className="text-[8px] font-black text-emerald-500/40 uppercase tracking-widest">Active Stream</span>
-           </div>
-           <span className="text-[8px] font-black text-white/10 uppercase tracking-[0.4em]">Capacity Max</span>
-        </div>
       </div>
     </div>
   );

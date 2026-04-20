@@ -2,7 +2,7 @@
 // All authenticated requests go through `apiFetch` which automatically
 // attaches the JWT token from localStorage.
 
-const API_BASE = "http://127.0.0.1:5051/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5051/api";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

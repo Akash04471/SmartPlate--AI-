@@ -9,19 +9,20 @@ const connectionString = (env.DATABASE_URL || "").trim();
 
 export const pool = new pg.Pool({
   connectionString,
-  ssl: connectionString.includes('supabase.co') || env.NODE_ENV === "production" 
+  // Supabase Pooler (Port 6543) and Direct (Port 5432) both work best with this SSL config on Vercel
+  ssl: (connectionString.includes('supabase.co') || connectionString.includes('pooler.supabase.com') || env.NODE_ENV === "production")
     ? { rejectUnauthorized: false } 
     : false,
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000,
 });
 
 try {
-  const host = new URL(connectionString).host;
-  console.log("📡 Initializing DB Pool for host:", host);
+  const urlObj = new URL(connectionString);
+  console.log(`📡 DB Config: Host=${urlObj.host}, Port=${urlObj.port}, SSL=${!!pool.options.ssl}`);
 } catch (e) {
-  console.error("❌ Failed to parse DATABASE_URL host");
+  console.error("❌ Invalid DATABASE_URL format");
 }
 
 pool.on('error', (err) => {

@@ -11,7 +11,7 @@ import nutritionRoutes from './routes/nutrition.routes.js';
 import progressRoutes  from './routes/progress.routes.js';
 import coachRoutes     from './routes/coach.routes.js';
 import tribeRoutes     from './routes/tribe.routes.js';
-
+import { pool }        from './db/index.js';
 
 
 const app = express();
@@ -47,6 +47,22 @@ const apiLimiter = rateLimit({
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/debug-db', async (req, res) => {
+  try {
+    const tableRes = await pool.query(`
+      SELECT table_schema, table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `);
+    res.json({
+      success: true,
+      tables: tableRes.rows,
+      message: tableRes.rows.length === 0 ? "No tables found in 'public' schema" : `Found ${tableRes.rows.length} tables`
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
 app.get('/',       (req, res) => res.send('API is running'));
 
 app.use('/api/auth',      authLimiter, authRoutes);

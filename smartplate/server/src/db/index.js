@@ -17,6 +17,13 @@ export const pool = new pg.Pool({
   connectionTimeoutMillis: 5000,
 });
 
+try {
+  const host = new URL(connectionString).host;
+  console.log("📡 Initializing DB Pool for host:", host);
+} catch (e) {
+  console.error("❌ Failed to parse DATABASE_URL host");
+}
+
 pool.on('error', (err) => {
   console.error('❌ Unexpected database pool error:', err.message);
 });

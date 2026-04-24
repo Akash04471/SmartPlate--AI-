@@ -2,7 +2,15 @@
 // All authenticated requests go through `apiFetch` which automatically
 // attaches the JWT token from localStorage.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5051/api";
+const getApiBase = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname || "localhost";
+    return `http://${host}:5051/api`;
+  }
+  return "http://localhost:5051/api";
+};
+const API_BASE = getApiBase();
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -226,6 +234,13 @@ export async function getCoachInsights() {
     };
     message?: string;
   }>("/coach/insights");
+}
+
+export async function chatWithCoach(message: string, history: { role: 'user' | 'model'; content: string }[] = []) {
+  return apiFetch<{ message: string }>("/coach/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, history }),
+  });
 }
 
 // ─── Social Tribes ─────────────────────────────────────────────────────────

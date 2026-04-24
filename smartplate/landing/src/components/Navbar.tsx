@@ -7,10 +7,10 @@ import Image from "next/image";
 
 const navLinks = [
     { label: "How it Works", href: "#features" },
+    { label: "AI Coach", href: "/ai-coach" },
     { label: "Diet Plans", href: "#diets" },
     { label: "Tracking", href: "#features" },
     { label: "Rewards", href: "#rewards" },
-    { label: "Testimonials", href: "#testimonials" },
 ];
 
 export default function Navbar() {

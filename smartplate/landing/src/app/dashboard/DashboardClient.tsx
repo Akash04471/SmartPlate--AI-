@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, Utensils, TrendingUp, Trophy, Settings, 
   LogOut, Search, Bell, Flame, Target, Zap, Plus, X, Sparkles, ChevronRight, Camera, Image as ImageIcon, Activity,
-  Scale
+  Scale, Bot
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -26,6 +26,7 @@ import GlassTilt from "@/components/GlassTilt";
 import FoodParticles from "@/components/FoodParticles";
 import MetabolicRuler from "@/components/MetabolicRuler";
 import Image from "next/image";
+import AICoachChat from "@/components/AICoachChat";
 
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ const sidebarItems = [
   { icon: <Utensils size={20} />, label: "Diet Plan", id: "diet" },
   { icon: <TrendingUp size={20} />, label: "Progress", id: "progress" },
   { icon: <Trophy size={20} />, label: "Awards", id: "awards" },
+  { icon: <Bot size={20} />, label: "AI Coach", id: "coach" },
   { icon: <Sparkles size={20} />, label: "Community", id: "community" },
   { icon: <Settings size={20} />, label: "Settings", id: "settings" },
 ];
@@ -344,6 +346,15 @@ export function DashboardClient() {
           {activeTab === "progress" && <ProgressTab key="progress" weightHistory={weightHistory} adherenceStats={adherenceStats} onLogWeight={(w: number) => { logWeight(w); loadData(); }} />}
 
           {activeTab === "awards" && <AwardsTab key="awards" adherenceStats={adherenceStats} isUnlocked={isCheatDayUnlocked} profile={profile} />}
+          {activeTab === "coach" && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="h-[88vh] w-full max-w-7xl mx-auto"
+            >
+              <AICoachChat />
+            </motion.div>
+          )}
           {activeTab === "settings" && <SettingsTab key="settings" profile={profile} onUpdate={() => loadData()} />}
         </AnimatePresence>
       </main>
@@ -351,7 +362,7 @@ export function DashboardClient() {
       {/* ─── BOTTOM NAVIGATION (Mobile) ────────────────────────── */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-black/80 backdrop-blur-3xl border-t border-white/5 px-4 pb-8 pt-4">
         <div className="flex justify-between items-center max-w-md mx-auto">
-          {sidebarItems.slice(0, 5).map((item) => (
+          {sidebarItems.slice(0, 6).map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
@@ -1826,7 +1837,7 @@ function CoachModal({ onClose, coachInsights }: any) {
         initial={{ scale: 0.9, opacity: 0, y: 20 }} 
         animate={{ scale: 1, opacity: 1, y: 0 }} 
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="w-full max-w-2xl bg-[#0a0a0a] border border-white/5 rounded-[4rem] p-16 relative z-10 shadow-[0_50px_100px_rgba(0,0,0,1)] overflow-hidden"
+        className="w-full max-w-6xl h-[85vh] bg-[#0a0a0a] border border-white/5 rounded-[3rem] p-10 md:p-14 relative z-10 shadow-[0_50px_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col"
       >
         <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
            <Sparkles size={200} strokeWidth={0.5} />
@@ -1841,38 +1852,10 @@ function CoachModal({ onClose, coachInsights }: any) {
           <h2 className="text-5xl font-black italic tracking-tighter" style={{ fontFamily: 'var(--font-display)' }}>Nutritional Intelligence Assistant</h2>
         </div>
 
-        <div className="space-y-12 relative z-10">
-          <div className="p-10 bg-white/[0.02] border border-white/5 rounded-[2.5rem]">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-6">Current Feedback</h4>
-            <p className="text-2xl text-white/80 leading-snug italic font-medium">
-              "{coachInsights?.data?.advice || "Awaiting metabolic sync..."}"
-            </p>
-          </div>
+        <div className="relative z-10">
+          <AICoachChat />
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="p-8 border border-white/5 bg-white/[0.01] rounded-[2rem]">
-               <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 mb-4">Target Alignment</p>
-               <div className="flex items-baseline gap-2">
-                 <span className="text-4xl font-black italic text-emerald-400">
-                   {coachInsights?.data ? Math.round((coachInsights.data.intake.calories / coachInsights.data.targets.calories) * 100) : 0}%
-                 </span>
-                 <span className="text-[10px] text-white/10 font-black uppercase">Accuracy</span>
-               </div>
-            </div>
-            <div className="p-8 border border-white/5 bg-white/[0.01] rounded-[2rem]">
-               <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 mb-4">Recommendation</p>
-               <div className="flex items-baseline gap-2">
-                 <span className="text-4xl font-black italic text-white/80">
-                    {coachInsights?.data?.suggestion?.amount || "0"}
-                 </span>
-                 <span className="text-[10px] text-white/10 font-black uppercase">
-                    {coachInsights?.data?.suggestion?.unit || ""} {coachInsights?.data?.suggestion?.type || "STABLE"}
-                 </span>
-               </div>
-            </div>
-          </div>
-
-          <div className="pt-6 border-t border-white/5">
+          <div className="pt-8 border-t border-white/5 mt-8">
              <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.4em] text-center italic">Calculated in real-time based on active physiological mandates.</p>
           </div>
         </div>

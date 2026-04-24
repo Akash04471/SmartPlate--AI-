@@ -1,6 +1,13 @@
 import { db } from '../db/index.js';
-import { mealLogs, mealLogItems, userProfiles, healthProtocols } from '../db/schema.js';
+import { mealLogs, mealLogItems, userProfiles, healthProtocols, weightLogs } from '../db/schema.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
+import fs from 'fs';
+
+const logToFile = (msg) => {
+  const timestamp = new Date().toISOString();
+  fs.appendFileSync('coach_debug.log', `[${timestamp}] ${msg}\n`);
+};
 
 /**
  * GET /api/coach/insights
@@ -114,5 +121,213 @@ export const getCoachInsights = async (req, res, next) => {
 
   } catch (err) {
     next(err);
+  }
+};
+
+/**
+ * POST /api/coach/chat
+ * Talkable AI Coach using Gemini
+ */
+export const chatWithCoach = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { message, history = [] } = req.body;
+
+    logToFile(`Chat request from user ${userId}: "${message}"`);
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // 1. Gather Rich Context
+    logToFile(`Gathering context for user ${userId}...`);
+    
+    let profile, activeProtocols, recentLogs, recentWeights;
+    
+    try {
+      [profile, activeProtocols, recentLogs, recentWeights] = await Promise.all([
+        db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).then(rows => rows[0]),
+        db.select().from(healthProtocols).where(and(
+          eq(healthProtocols.userId, userId),
+          eq(healthProtocols.status, 'active')
+        )).orderBy(desc(healthProtocols.createdAt)),
+        db.select({
+          mealType: mealLogs.mealType,
+          loggedAt: mealLogs.loggedAt,
+          calories: mealLogItems.calories,
+          protein: mealLogItems.proteinG,
+          carbs: mealLogItems.carbsG,
+          fat: mealLogItems.fatG,
+          foodName: mealLogItems.foodName
+        })
+        .from(mealLogItems)
+        .innerJoin(mealLogs, eq(mealLogItems.mealLogId, mealLogs.id))
+        .where(and(
+          eq(mealLogs.userId, userId),
+          gte(mealLogs.loggedAt, new Date(Date.now() - 3 * 24 * 60 * 60 * 1000))
+        ))
+        .orderBy(desc(mealLogs.loggedAt)),
+        db.select().from(weightLogs)
+          .where(eq(weightLogs.userId, userId))
+          .orderBy(desc(weightLogs.loggedAt))
+          .limit(5)
+      ]);
+      logToFile("Context gathering successful.");
+    } catch (dbErr) {
+      logToFile(`DATABASE ERROR during context gathering: ${dbErr.message}`);
+      throw dbErr;
+    }
+
+    if (!profile) {
+      logToFile(`Profile not found for user ${userId}`);
+      return res.status(404).json({ error: 'Profile not found.' });
+    }
+
+    logToFile(`Context summary: ${recentLogs.length} logs, ${activeProtocols.length} protocols, ${recentWeights.length} weight entries.`);
+
+    // 2. Prepare context for Gemini
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayLogs = recentLogs.filter(log => new Date(log.loggedAt) >= today);
+    
+    const todayIntake = todayLogs.reduce((acc, log) => ({
+      calories: acc.calories + (log.calories || 0),
+      protein: acc.protein + (log.protein || 0),
+      carbs: acc.carbs + (log.carbs || 0),
+      fat: acc.fat + (log.fat || 0),
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+    const activeProtocol = activeProtocols[0];
+    const targets = {
+      calories: activeProtocol?.targetCalories || profile.dailyCalorieTarget || 2000,
+      protein:  activeProtocol?.targetProteinG  || profile.dailyProteinTargetG || 150,
+      carbs:    activeProtocol?.targetCarbsG    || profile.dailyCarbsTargetG   || 200,
+      fat:      activeProtocol?.targetFatG      || profile.dailyFatTargetG     || 70,
+    };
+
+    const context = `
+User Context:
+- Goal: ${profile.goalType || 'Not set'}
+- Diet Preference: ${profile.dietPreference || 'Omnivore'}
+- Nutritional Targets: ${targets.calories} kcal, ${targets.protein}g Protein, ${targets.carbs}g Carbs, ${targets.fat}g Fat.
+- Today's Intake so far: ${Math.round(todayIntake.calories)} kcal, ${Math.round(todayIntake.protein)}g Protein, ${Math.round(todayIntake.carbs)}g Carbs, ${Math.round(todayIntake.fat)}g Fat.
+- Active Protocol: ${activeProtocol ? `"${activeProtocol.title}" (${activeProtocol.description})` : 'None'}
+- Recent Weight Trend: ${recentWeights.map(w => `${w.weightKg}kg on ${new Date(w.loggedAt).toLocaleDateString()}`).join(', ') || 'No weight data logged yet'}
+- Recent Meals (last 3 days): ${recentLogs.slice(0, 10).map(l => `${l.foodName} (${l.calories}kcal)`).join(', ')}
+`;
+
+    // 3. Initialize Gemini
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      logToFile("GEMINI_API_KEY is missing in .env");
+      return res.status(500).json({ error: 'AI Coach configuration error' });
+    }
+
+    logToFile("Initializing Gemini 2.5 Flash...");
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    const systemPrompt = `
+You are "SmartPlate AI", a professional, motivating, and highly intelligent health and nutrition coach.
+Your goal is to help the user achieve their fitness targets through precision guidance.
+Use the provided User Context to give personalized, data-driven advice.
+Be concise but encouraging. If the user is off-track, be supportive but firm on adjustments.
+If the user asks about their progress, use the weight trend and macro intake data.
+Always maintain a premium, high-tech persona.
+
+${context}
+`;
+
+    // Gemini history MUST start with 'user' role. 
+    // If the frontend sends a leading model message (like the greeting), we must strip it or prepend a user message.
+    let formattedHistory = history.map(h => ({
+      role: h.role === 'user' ? 'user' : 'model',
+      parts: [{ text: h.content }],
+    }));
+
+    // Find the first index of a 'user' message
+    const firstUserIndex = formattedHistory.findIndex(h => h.role === 'user');
+    if (firstUserIndex !== -1) {
+      formattedHistory = formattedHistory.slice(firstUserIndex);
+    } else {
+      formattedHistory = []; // If no user message found, start fresh
+    }
+
+    const modelNames = [
+      "gemini-pro-latest", 
+      "gemini-flash-latest", 
+      "gemini-2.0-flash-lite", 
+      "gemini-2.5-flash",
+      "gemma-3-27b-it"
+    ];
+    logToFile(`Model grid initialized with: ${modelNames.join(", ")}`);
+
+    // 4. Start Chat & Send Message (Smart Swapping)
+    let result;
+    let retries = 5; // Increased retries for better failover
+    let currentModelIndex = 0;
+
+    while (retries >= 0) {
+      const activeModelName = modelNames[currentModelIndex];
+      logToFile(`Attempting with model: ${activeModelName} (Retries left: ${retries})`);
+      
+      try {
+        const model = genAI.getGenerativeModel({ 
+          model: activeModelName,
+          systemInstruction: systemPrompt,
+          // Only add search tool to Flash/Pro models, Gemma doesn't support it the same way
+          ...(activeModelName.includes('gemini') ? { tools: [{ googleSearch: {} }] } : {})
+        });
+
+        const chat = model.startChat({
+          history: formattedHistory
+        });
+
+        result = await chat.sendMessage(message);
+        logToFile(`Success with model: ${activeModelName}`);
+        break;
+      } catch (err) {
+        logToFile(`Error with ${activeModelName}: ${err.message}`);
+        
+        const errorMessage = err.message || "";
+        const isRetryable = errorMessage.includes('429') || 
+                          errorMessage.includes('503') || 
+                          errorMessage.includes('404') ||
+                          errorMessage.includes('quota');
+
+        if (isRetryable) {
+          // SWAP MODEL for next attempt
+          currentModelIndex = (currentModelIndex + 1) % modelNames.length;
+          logToFile(`Swapping to next available model tier: ${modelNames[currentModelIndex]}`);
+          
+          // Wait longer for each retry (exponential-ish backoff)
+          const waitTime = (6 - retries) * 1500; 
+          await new Promise(r => setTimeout(r, waitTime));
+          retries--;
+          if (retries < 0) throw err;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    const response = await result.response;
+    const text = response.text();
+
+    logToFile(`Gemini response success for user ${userId}`);
+
+    res.json({
+      message: text,
+    });
+
+  } catch (err) {
+    logToFile(`CRITICAL ERROR: ${err.message}\nStack: ${err.stack}`);
+    console.error("❌ Coach Chat Error:", err);
+    
+    let userErrorMessage = 'Failed to communicate with AI Coach. Technical grid failure.';
+    if (err.message?.includes('429') || err.status === 429) {
+      userErrorMessage = 'Metabolic grid saturated. Please wait a few seconds and try again.';
+    }
+
+    res.status(500).json({ error: userErrorMessage });
   }
 };

@@ -19,6 +19,7 @@ import VisualIntelligence from "@/components/VisualIntelligence";
 import InteractiveMacroProfiler from "@/components/InteractiveMacroProfiler";
 import DietPlansSection from "@/components/DietPlansSection";
 import RewardsSection from "@/components/RewardsSection";
+import AICoachShowcase from "@/components/AICoachShowcase";
 import {
   features,
   testimonials,
@@ -718,6 +719,9 @@ export default function Home() {
           <div className="border-y border-white/5">
             <DashboardShowcase />
           </div>
+
+          {/* ─── AI COACH SHOWCASE ─────────────────────────────────── */}
+          <AICoachShowcase />
 
           {/* ─── DIET PLANS ────────────────────────────────────────── */}
           <DietPlansSection />

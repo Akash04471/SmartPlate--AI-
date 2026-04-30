@@ -253,17 +253,15 @@ ${context}
     }
 
     const modelNames = [
-      "gemini-pro-latest", 
-      "gemini-flash-latest", 
-      "gemini-2.0-flash-lite", 
-      "gemini-2.5-flash",
-      "gemma-3-27b-it"
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+      "gemini-2.0-flash-exp",
     ];
     logToFile(`Model grid initialized with: ${modelNames.join(", ")}`);
 
     // 4. Start Chat & Send Message (Smart Swapping)
     let result;
-    let retries = 5; // Increased retries for better failover
+    let retries = 3; 
     let currentModelIndex = 0;
 
     while (retries >= 0) {
@@ -274,7 +272,6 @@ ${context}
         const model = genAI.getGenerativeModel({ 
           model: activeModelName,
           systemInstruction: systemPrompt,
-          // Only add search tool to Flash/Pro models, Gemma doesn't support it the same way
           ...(activeModelName.includes('gemini') ? { tools: [{ googleSearch: {} }] } : {})
         });
 
@@ -292,18 +289,17 @@ ${context}
         const isRetryable = errorMessage.includes('429') || 
                           errorMessage.includes('503') || 
                           errorMessage.includes('404') ||
-                          errorMessage.includes('quota');
+                          errorMessage.includes('quota') ||
+                          errorMessage.includes('models/');
 
-        if (isRetryable) {
+        if (isRetryable && retries > 0) {
           // SWAP MODEL for next attempt
           currentModelIndex = (currentModelIndex + 1) % modelNames.length;
           logToFile(`Swapping to next available model tier: ${modelNames[currentModelIndex]}`);
           
-          // Wait longer for each retry (exponential-ish backoff)
-          const waitTime = (6 - retries) * 1500; 
+          const waitTime = (4 - retries) * 1000; 
           await new Promise(r => setTimeout(r, waitTime));
           retries--;
-          if (retries < 0) throw err;
         } else {
           throw err;
         }

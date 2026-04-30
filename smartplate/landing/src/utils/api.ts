@@ -3,9 +3,17 @@
 // attaches the JWT token from localStorage.
 
 const getApiBase = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    // Remove trailing slash if present to avoid double slashes
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+  }
   if (typeof window !== "undefined") {
     const host = window.location.hostname || "localhost";
+    const protocol = window.location.protocol;
+    // In production Vercel, if env var is missing, assume same host but /api
+    if (host.includes("vercel.app")) {
+      return `${protocol}//${host}/api`;
+    }
     return `http://${host}:5051/api`;
   }
   return "http://localhost:5051/api";
@@ -53,7 +61,11 @@ export async function apiFetch<T = any>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  // Ensure path starts with a slash
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_BASE}${normalizedPath}`;
+
+  const res = await fetch(url, {
     ...options,
     headers,
   });
@@ -71,11 +83,30 @@ export async function apiFetch<T = any>(
   // 204 No Content (e.g. DELETE)
   if (res.status === 204) return undefined as T;
 
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.error || `API error ${res.status}`);
+  // Check if response is JSON
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || `API error ${res.status}`);
+    }
+    return json;
+  } else {
+    // If not JSON, it's likely an HTML error page (like a Vercel 404)
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error(`Endpoint not found (404). Please verify backend deployment at ${API_BASE}`);
+      }
+      throw new Error(`Server returned non-JSON response (${res.status})`);
+    }
+    // If OK but not JSON (unexpected but possible)
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text as any;
+    }
   }
-  return json;
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────

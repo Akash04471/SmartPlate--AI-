@@ -6,23 +6,38 @@ const getApiBase = () => {
   let url = process.env.NEXT_PUBLIC_API_URL || "";
   
   if (url) {
-    // Self-healing: Fix common typos in vercel.app
-    url = url.replace(/vercel\.pp$/i, "vercel.app");
-    url = url.replace(/vercel_pp$/i, "vercel.app");
-    // Remove trailing slash if present to avoid double slashes
-    return url.replace(/\/$/, "");
+    // 1. Fix common typos (e.g. vercel_pp or vercel.pp anywhere in the domain part)
+    url = url.replace(/vercel\.pp\b/i, "vercel.app");
+    url = url.replace(/vercel_pp\b/i, "vercel.app");
+    
+    // 2. Ensure protocol is present for absolute URLs
+    if (url.includes("vercel.app") && !url.startsWith("http")) {
+      url = `https://${url}`;
+    } else if (url.includes("localhost") && !url.startsWith("http")) {
+      url = `http://${url}`;
+    }
+    
+    // 3. Remove trailing slash
+    url = url.replace(/\/$/, "");
+
+    // 4. If it still looks like a relative path but contains a known domain, treat as absolute
+    if (!url.startsWith("http") && url.includes(".")) {
+      url = `https://${url}`;
+    }
+
+    return url;
   }
 
+  // Client-side fallback logic
   if (typeof window !== "undefined") {
-    const host = window.location.hostname || "localhost";
-    const protocol = window.location.protocol;
+    const host = window.location.hostname;
     
     // In production Vercel, if env var is missing, assume same host but /api
     if (host.includes("vercel.app")) {
-      return `${protocol}//${host}/api`;
+      return `${window.location.protocol}//${host}/api`;
     }
     
-    // Fallback for dev
+    // Fallback for local dev
     return `http://${host}:5051/api`;
   }
   
@@ -75,10 +90,16 @@ export async function apiFetch<T = any>(
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = `${API_BASE}${normalizedPath}`;
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    console.error(`[API] Network error at ${url}:`, err);
+    throw new Error(`Connection failed. Please ensure the backend at ${API_BASE} is running.`);
+  }
 
   // Handle 401 → redirect to login
   if (res.status === 401) {

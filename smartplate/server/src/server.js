@@ -6,8 +6,8 @@ const PORT = process.env.PORT || 5051;
 
 const server = http.createServer(app);
 
-server.keepAliveTimeout = 0;
-server.headersTimeout = 0;
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 
 // ── Error Handling ───────────────────────────────────────────────────────────
 server.on("error", (error) => {
@@ -18,6 +18,15 @@ server.on("error", (error) => {
     console.error("[FATAL] Server Error:", error);
     process.exit(1);
   }
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[FATAL] Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Uncaught Exception:", err);
+  process.exit(1);
 });
 
 // ── Lifecycle Management ─────────────────────────────────────────────────────

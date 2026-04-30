@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-// Helper to handle empty strings from frontend forms
+/**
+ * Helper to handle empty strings from frontend forms.
+ * Preprocess converts empty strings or nulls to undefined so .optional() works.
+ */
 const emptyToUndefined = (val) => (val === "" || val === null ? undefined : val);
 
 export const upsertProfileSchema = z.object({
@@ -27,5 +30,3 @@ export const upsertProfileSchema = z.object({
   dailyFatTargetG:      z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional()),
   coachEnabled:         z.boolean().optional(),
 });
-
-

@@ -29,8 +29,8 @@ app.use(express.json());
 // 10 attempts per 15 minutes per IP
 const authLimiter = rateLimit({
   windowMs:         15 * 60 * 1000,
-  max:              10,
-  standardHeaders:  true,   // sends RateLimit-* headers so clients know their limit
+  max:              50, // Increased for development
+  standardHeaders:  true,
   legacyHeaders:    false,
   message: { error: 'Too many attempts, please try again in 15 minutes' },
 });

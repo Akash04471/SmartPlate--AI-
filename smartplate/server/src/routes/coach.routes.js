@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware.js';
-import { getCoachInsights } from '../controllers/coach.controller.js';
+import { getCoachInsights, chatWithCoach } from '../controllers/coach.controller.js';
 
 const router = Router();
 
@@ -8,5 +8,6 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/insights', getCoachInsights);
+router.post('/chat', chatWithCoach);
 
 export default router;

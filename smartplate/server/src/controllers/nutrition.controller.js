@@ -85,8 +85,8 @@ export const interpretMeal = async (req, res) => {
     Provide ONLY the valid JSON array.
     Example Format: [{"name": "milk", "quantity": 150, "unit": "ml", "calories": 63, "protein": 5, "fat": 2, "carbs": 7, "fiber": 0}]`;
 
-    // Resilience Tiering
-    const modelNames = ["models/gemini-1.5-flash", "models/gemini-1.5-flash-latest", "models/gemini-pro"];
+    // Resilience Tiering - Updated for Stability (Using verified 2.0-flash)
+    const modelNames = ["gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash"];
     let result;
 
     for (const mName of modelNames) {
@@ -96,7 +96,7 @@ export const interpretMeal = async (req, res) => {
         result = await model.generateContent(prompt);
         if (result) break;
       } catch (err) {
-        console.warn(`⚠️ [Link Degraded]: ${mName} unreachable.`);
+        console.warn(`⚠️ [Link Degraded]: ${mName} unreachable: ${err.message}`);
       }
     }
 

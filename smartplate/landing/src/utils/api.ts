@@ -3,19 +3,29 @@
 // attaches the JWT token from localStorage.
 
 const getApiBase = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
+  let url = process.env.NEXT_PUBLIC_API_URL || "";
+  
+  if (url) {
+    // Self-healing: Fix common typos in vercel.app
+    url = url.replace(/vercel\.pp$/i, "vercel.app");
+    url = url.replace(/vercel_pp$/i, "vercel.app");
     // Remove trailing slash if present to avoid double slashes
-    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+    return url.replace(/\/$/, "");
   }
+
   if (typeof window !== "undefined") {
     const host = window.location.hostname || "localhost";
     const protocol = window.location.protocol;
+    
     // In production Vercel, if env var is missing, assume same host but /api
     if (host.includes("vercel.app")) {
       return `${protocol}//${host}/api`;
     }
+    
+    // Fallback for dev
     return `http://${host}:5051/api`;
   }
+  
   return "http://localhost:5051/api";
 };
 const API_BASE = getApiBase();

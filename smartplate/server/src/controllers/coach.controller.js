@@ -6,7 +6,16 @@ import fs from 'fs';
 
 const logToFile = (msg) => {
   const timestamp = new Date().toISOString();
-  fs.appendFileSync('coach_debug.log', `[${timestamp}] ${msg}\n`);
+  console.log(`[COACH] ${msg}`); // Standard console log for Vercel/Production logs
+  
+  // Only attempt file write if NOT in a production/serverless environment
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    try {
+      fs.appendFileSync('coach_debug.log', `[${timestamp}] ${msg}\n`);
+    } catch (err) {
+      // Silently fail on file system errors (e.g. EROFS on Vercel)
+    }
+  }
 };
 
 /**

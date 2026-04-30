@@ -599,7 +599,7 @@ function OverviewTab({ profile, userName, calPct, proteinPct, calCurrent, calTar
                 <span className="text-[9px] md:text-[10px] text-white/20 font-black uppercase tracking-widest text-center px-4">Awaiting Biometric Data Stream...</span>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={yesterdayData}>
                   <defs>
                     <linearGradient id="colorCal" x1="0" y1="0" x2="0" y2="1">
@@ -878,7 +878,7 @@ function ProgressTab({ weightHistory, adherenceStats, onLogWeight }: any) {
                 <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">Awaiting Biometric Data Stream...</span>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">

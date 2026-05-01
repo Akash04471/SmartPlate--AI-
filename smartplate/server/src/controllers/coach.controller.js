@@ -262,12 +262,10 @@ ${context}
     }
 
     const modelNames = [
-      "gemini-1.5-flash",
-      "gemini-1.5-pro",
-      "gemini-1.5-flash-latest",
-      "gemini-1.5-pro-latest",
+      "gemini-2.5-flash",
       "gemini-2.0-flash",
-      "gemini-2.0-flash-exp",
+      "gemini-2.0-flash-lite",
+      "gemini-2.5-pro",
     ];
     logToFile(`Model grid initialized with: ${modelNames.join(", ")}`);
 
@@ -331,11 +329,10 @@ ${context}
     logToFile(`CRITICAL ERROR: ${err.message}\nStack: ${err.stack}`);
     console.error("❌ Coach Chat Error:", err);
     
-    let userErrorMessage = 'Failed to communicate with AI Coach. Technical grid failure.';
-    if (err.message?.includes('429') || err.status === 429) {
-      userErrorMessage = 'Metabolic grid saturated. Please wait a few seconds and try again.';
-    }
-
-    res.status(500).json({ error: userErrorMessage });
+    // Return the actual underlying error for client debugging
+    res.status(500).json({ 
+      error: err.message || 'Failed to communicate with AI Coach.',
+      details: err.toString()
+    });
   }
 };

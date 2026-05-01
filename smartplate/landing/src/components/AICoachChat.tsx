@@ -43,9 +43,13 @@ export default function AICoachChat() {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
       const response = await chatWithCoach(userMessage, history);
       setMessages((prev) => [...prev, { role: "model", content: response.message, isNew: true }]);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Chat error:", err);
-      setMessages((prev) => [...prev, { role: "model", content: "Neural link interrupted. Please verify your connection to the metabolic grid.", isNew: true }]);
+      setMessages((prev) => [...prev, { 
+        role: "model", 
+        content: err.message || "Neural link interrupted. Please verify your connection to the metabolic grid.", 
+        isNew: true 
+      }]);
     } finally {
       setLoading(false);
     }

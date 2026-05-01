@@ -264,13 +264,16 @@ ${context}
     const modelNames = [
       "gemini-1.5-flash",
       "gemini-1.5-pro",
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-pro-latest",
+      "gemini-2.0-flash",
       "gemini-2.0-flash-exp",
     ];
     logToFile(`Model grid initialized with: ${modelNames.join(", ")}`);
 
     // 4. Start Chat & Send Message (Smart Swapping)
     let result;
-    let retries = 3; 
+    let retries = 5; // More retries to go through the grid
     let currentModelIndex = 0;
 
     while (retries >= 0) {
@@ -280,8 +283,8 @@ ${context}
       try {
         const model = genAI.getGenerativeModel({ 
           model: activeModelName,
-          systemInstruction: systemPrompt,
-          ...(activeModelName.includes('gemini') ? { tools: [{ googleSearch: {} }] } : {})
+          systemInstruction: systemPrompt
+          // Removed tools: [{ googleSearch: {} }] as it can cause 404/not supported errors on some tiers
         });
 
         const chat = model.startChat({

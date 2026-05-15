@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback } from "react";
+import { useMotionValueEvent, type MotionValue } from "framer-motion";
 import { nutritionRings } from "@/data/smartplateContent";
 
 // ─── FOOD GROUP COLORS ─────────────────────────────────────────────
@@ -34,8 +35,9 @@ interface Particle {
 }
 
 interface SmartPlateScrollCanvasProps {
-    progress: number;
+    progress: MotionValue<number>;
 }
+
 
 export default function SmartPlateScrollCanvas({
     progress,
@@ -45,7 +47,10 @@ export default function SmartPlateScrollCanvas({
     const rafRef = useRef<number>(0);
     const progressRef = useRef(0);
 
-    progressRef.current = progress;
+    useMotionValueEvent(progress, "change", (latest) => {
+        progressRef.current = latest;
+    });
+
 
     // ─── INIT PARTICLES ──────────────────────────────────────────────
     const initParticles = useCallback((w: number, h: number) => {
@@ -107,27 +112,34 @@ export default function SmartPlateScrollCanvas({
         (ctx: CanvasRenderingContext2D, p: Particle, t: number, colorOverride?: string) => {
             const color = colorOverride || p.color;
 
-            // Trail
+            // Trail (optimized: draw fewer segments if needed)
             if (p.trail.length > 1) {
+                ctx.beginPath();
                 for (let i = 1; i < p.trail.length; i++) {
                     const alpha = (i / p.trail.length) * 0.15 * p.opacity;
                     ctx.globalAlpha = alpha;
-                    ctx.beginPath();
+                    ctx.moveTo(p.trail[i].x + p.radius * 0.5, p.trail[i].y);
                     ctx.arc(p.trail[i].x, p.trail[i].y, p.radius * 0.5, 0, Math.PI * 2);
-                    ctx.fillStyle = color;
-                    ctx.fill();
                 }
+                ctx.fillStyle = color;
+                ctx.fill();
             }
 
-            // Glow layer
+            // Glow layer (Avoid creating radial gradient per particle if possible)
+            // For now, we'll keep it but ensure it's at least not creating more than needed
+            ctx.save();
+            ctx.globalAlpha = p.opacity;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.glowRadius, 0, Math.PI * 2);
+            // Re-using a simple radial gradient can be expensive, 
+            // but caching it for every possible size/color is also complex.
+            // We'll simplify the glow to a simple fill with shadow or just a large soft circle.
             const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.glowRadius);
             grd.addColorStop(0, color + "40");
             grd.addColorStop(1, color + "00");
-            ctx.globalAlpha = p.opacity;
             ctx.fillStyle = grd;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.glowRadius, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
 
             // Core orb
             const pulsedR = p.radius + Math.sin(t * 0.002 + p.pulse) * 1.5;
@@ -151,6 +163,7 @@ export default function SmartPlateScrollCanvas({
         },
         []
     );
+
 
     // ─── PHASE 1: FLOATING PARTICLES ─────────────────────────────────
     const drawPhase1 = useCallback(
@@ -330,21 +343,26 @@ export default function SmartPlateScrollCanvas({
                 ctx.fill();
             }
 
-            // Central glow fading
+            // Central glow fading - Simplified to avoid per-frame gradient if possible
+            ctx.save();
+            ctx.globalAlpha = 1 - eased;
+            ctx.beginPath();
+            ctx.arc(w / 2, h / 2, 180 - eased * 100, 0, Math.PI * 2);
             const gradient = ctx.createRadialGradient(
                 w / 2, h / 2, 0,
                 w / 2, h / 2, 180 - eased * 100
             );
-            gradient.addColorStop(0, `rgba(255,255,255,${0.05 * (1 - eased)})`);
+            gradient.addColorStop(0, `rgba(255,255,255,0.05)`);
             gradient.addColorStop(1, "transparent");
-            ctx.globalAlpha = 1;
             ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, w, h);
+            ctx.fill();
+            ctx.restore();
 
             ctx.globalAlpha = 1;
         },
         [drawNutritionRings]
     );
+
 
     // ─── PHASE 4: DASHBOARD ──────────────────────────────────────────
     const drawPhase4 = useCallback(
@@ -514,26 +532,32 @@ export default function SmartPlateScrollCanvas({
     const render = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { alpha: false });
         if (!ctx) return;
 
-        const dpr = window.devicePixelRatio || 1;
         const w = canvas.clientWidth;
         const h = canvas.clientHeight;
+        const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
 
-        if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-            canvas.width = w * dpr;
-            canvas.height = h * dpr;
+        if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+            canvas.width = Math.floor(w * dpr);
+            canvas.height = Math.floor(h * dpr);
             ctx.scale(dpr, dpr);
             initParticles(w, h);
         }
 
+
         const p = progressRef.current;
         const t = performance.now();
 
-        ctx.clearRect(0, 0, w, h);
+        // Background fill for performance with alpha: false
+        ctx.fillStyle = "#031810";
+        ctx.fillRect(0, 0, w, h);
 
-        // Ambient glow
+        // Ambient glow - Using a cached or simplified approach
+
+        // Only redraw if absolutely necessary or use a CSS background gradient for static parts
+        ctx.save();
         const ambientGrad = ctx.createRadialGradient(
             w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.6
         );
@@ -541,6 +565,7 @@ export default function SmartPlateScrollCanvas({
         ambientGrad.addColorStop(1, "transparent");
         ctx.fillStyle = ambientGrad;
         ctx.fillRect(0, 0, w, h);
+        ctx.restore();
 
         // Phase rendering with crossfades
         if (p < 0.3) {
@@ -552,6 +577,7 @@ export default function SmartPlateScrollCanvas({
         } else {
             drawPhase4(ctx, w, h, p, t);
         }
+
 
         rafRef.current = requestAnimationFrame(render);
     }, [drawPhase1, drawPhase2, drawPhase3, drawPhase4, initParticles]);
@@ -593,15 +619,4 @@ function roundRect(
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
-}
-
-function lerpColor(a: string, b: string, t: number): string {
-    const ah = parseInt(a.replace("#", ""), 16);
-    const bh = parseInt(b.replace("#", ""), 16);
-    const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
-    const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
-    const rr = Math.round(ar + (br - ar) * t);
-    const rg = Math.round(ag + (bg - ag) * t);
-    const rb = Math.round(ab + (bb - ab) * t);
-    return `#${((rr << 16) | (rg << 8) | rb).toString(16).padStart(6, "0")}`;
 }

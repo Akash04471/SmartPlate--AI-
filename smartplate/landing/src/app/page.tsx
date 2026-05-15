@@ -565,14 +565,8 @@ export default function Home() {
   const canvasProgress = useTransform(scrollYProgress, [0, 1], [0, 1]);
   const globalProgress = useTransform(globalScroll, [0, 1], [0, 1]);
 
-  useEffect(() => {
-    if (!isLoading) {
-      (async () => {
-        const LocomotiveScroll = (await import("locomotive-scroll")).default;
-        new LocomotiveScroll();
-      })();
-    }
-  }, [isLoading]);
+  // Removed redundant LocomotiveScroll as Lenis is used in layout.tsx
+
 
   const handleLoadingComplete = useCallback(() => {
     setIsLoading(false);
@@ -937,33 +931,24 @@ export default function Home() {
 
 // ─── CANVAS BRIDGE ──────────────────────────────────────────────────
 function CanvasBridge({ progress }: { progress: MotionValue<number> }) {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    const unsub = progress.on("change", (v) => setValue(v));
-    return unsub;
-  }, [progress]);
-
-  return <SmartPlateScrollCanvas progress={value} />;
+  return <SmartPlateScrollCanvas progress={progress} />;
 }
+
 
 // ─── CANVAS RULER ───────────────────────────────────────────────────
 function CanvasRuler({ progress }: { progress: MotionValue<number> }) {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    const unsub = progress.on("change", (v) => setValue(v));
-    return unsub;
-  }, [progress]);
+  const scaledProgress = useTransform(progress, [0, 1], [0, 1000]);
 
   return (
     <MetabolicRuler 
-      value={Math.round(value * 1000)} 
+      value={scaledProgress} 
       onChange={() => {}} 
       unit="CAL" 
+      max={1000}
     />
   );
 }
+
 
 // ─── ANIMATED STAT ──────────────────────────────────────────────────
 function AnimatedStat({

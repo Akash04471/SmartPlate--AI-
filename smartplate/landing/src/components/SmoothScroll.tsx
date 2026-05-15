@@ -8,11 +8,12 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 2.2, // Luxurious Slow Duration
+      duration: 1.5, // Snappier Duration
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
-      lerp: 0.05, // High inertia for liquid feel
+      lerp: 0.08, // Increased responsiveness
     });
+
 
 
     lenisRef.current = lenis;

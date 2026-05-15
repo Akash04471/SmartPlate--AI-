@@ -15,12 +15,31 @@ interface Message {
 }
 
 export default function AICoachChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "model", content: "Protocol synchronized. I am SmartPlate AI, your precision nutrition coach. How can I assist your metabolic journey today?", isNew: false }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load history from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("smartplate_coach_chat");
+    if (saved) {
+      try {
+        setMessages(JSON.parse(saved));
+      } catch (e) {
+        setMessages([{ role: "model", content: "Protocol synchronized. I am SmartPlate AI, your precision nutrition coach. How can I assist your metabolic journey today?", isNew: false }]);
+      }
+    } else {
+      setMessages([{ role: "model", content: "Protocol synchronized. I am SmartPlate AI, your precision nutrition coach. How can I assist your metabolic journey today?", isNew: false }]);
+    }
+  }, []);
+
+  // Save history to local storage
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem("smartplate_coach_chat", JSON.stringify(messages));
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -40,10 +59,13 @@ export default function AICoachChat() {
     setLoading(true);
 
     try {
-      const history = messages.map(m => ({ role: m.role, content: m.content }));
+      // Professional Optimization: Only send the last 10 messages as context to save tokens/quota
+      const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
+      
       const response = await chatWithCoach(userMessage, history);
       setMessages((prev) => [...prev, { role: "model", content: response.message, isNew: true }]);
     } catch (err: any) {
+
       console.error("Chat error:", err);
       setMessages((prev) => [...prev, { 
         role: "model", 

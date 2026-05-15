@@ -2,20 +2,9 @@ import { db } from '../db/index.js';
 import { mealLogs, mealLogItems, userProfiles, healthProtocols, weightLogs } from '../db/schema.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
-import fs from 'fs';
 
 const logToFile = (msg) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[COACH] ${msg}`); // Standard console log for Vercel/Production logs
-  
-  // Only attempt file write if NOT in a production/serverless environment
-  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-    try {
-      fs.appendFileSync('coach_debug.log', `[${timestamp}] ${msg}\n`);
-    } catch (err) {
-      // Silently fail on file system errors (e.g. EROFS on Vercel)
-    }
-  }
+  console.log(`[COACH] ${msg}`);
 };
 
 /**
@@ -263,11 +252,14 @@ ${context}
 
     const modelNames = [
       "gemini-2.5-flash",
+      "gemini-flash-latest",
+      "gemini-1.5-flash",
       "gemini-2.0-flash",
       "gemini-2.0-flash-lite",
       "gemini-2.5-pro",
     ];
     logToFile(`Model grid initialized with: ${modelNames.join(", ")}`);
+
 
     // 4. Start Chat & Send Message (Smart Swapping)
     let result;
@@ -307,9 +299,11 @@ ${context}
           currentModelIndex = (currentModelIndex + 1) % modelNames.length;
           logToFile(`Swapping to next available model tier: ${modelNames[currentModelIndex]}`);
           
-          const waitTime = (4 - retries) * 1000; 
+          // Progressive wait: longer wait for 429s specifically
+          const waitTime = errorMessage.includes('429') ? (6 - retries) * 1500 : (6 - retries) * 500; 
           await new Promise(r => setTimeout(r, waitTime));
           retries--;
+
         } else {
           throw err;
         }

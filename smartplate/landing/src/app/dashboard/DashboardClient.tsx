@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useRef } from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, Utensils, TrendingUp, Trophy, Settings, 
   LogOut, Search, Bell, Flame, Target, Zap, Plus, X, Sparkles, ChevronRight, Camera, Image as ImageIcon, Activity,
-  Scale, Bot
+  Scale, Bot, Menu
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -104,6 +105,10 @@ export function DashboardClient() {
   const [activeProtocols, setActiveProtocols] = useState<any[]>([]);
   const [protocolSummary, setProtocolSummary] = useState<any>(null);
   const [showCoachModal, setShowCoachModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const lastCoachFetch = useRef<number>(0);
+
+
 
 
 
@@ -193,13 +198,20 @@ export function DashboardClient() {
         setIsCheatDayUnlocked(data.awards?.some((a: any) => a.type === 'cheat_day_unlock'));
       }
 
-      // Fetch AI Coach Insights
-      try {
-        const coachRes = await getCoachInsights();
-        setCoachInsights(coachRes);
-      } catch (err) {
-        console.error("Coach insights load error:", err);
+      // Fetch AI Coach Insights with Smart Cache (5 min TTL)
+      const nowTs = Date.now();
+      if (nowTs - lastCoachFetch.current > 5 * 60 * 1000) {
+        try {
+          const coachRes = await getCoachInsights();
+          if (coachRes.enabled) {
+            setCoachInsights(coachRes.data);
+          }
+          lastCoachFetch.current = nowTs;
+        } catch (err) {
+          console.error("AI Coach Sync Issue:", err);
+        }
       }
+
 
       // Fetch Protocol Data
       try {
@@ -275,6 +287,23 @@ export function DashboardClient() {
       {/* Living Background */}
       <FoodParticles count={6} />
       
+      {/* ─── MOBILE HEADER ────────────────────────────────────────── */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-between items-center bg-black/40 backdrop-blur-md border-b border-white/5">
+        <Image 
+          src="/images/smartplate-logo.jpg" 
+          alt="SmartPlate Logo" 
+          width={120} 
+          height={38}
+          className="w-28 h-auto object-contain"
+        />
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-3 bg-white/[0.03] border border-white/5 rounded-xl text-white/40 hover:text-white transition-colors flex items-center gap-2"
+        >
+          <Menu size={20} />
+        </button>
+      </div>
+      
       {/* ─── SIDEBAR (Desktop) ────────────────────────────────────────── */}
       <aside className="hidden lg:flex w-64 border-r border-white/5 bg-[#080808] flex-col p-6 sticky top-0 h-screen">
         <div className="mb-12">
@@ -287,7 +316,7 @@ export function DashboardClient() {
           />
         </div>
         
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-2">
           {sidebarItems.map((item) => (
             <button 
               key={item.id}
@@ -312,7 +341,7 @@ export function DashboardClient() {
       </aside>
 
       {/* ─── MAIN CONTENT ───────────────────────────────────── */}
-      <main className="flex-1 px-6 py-8 md:p-10 lg:p-12 pb-32 lg:pb-12 overflow-y-auto">
+      <main className="flex-1 px-6 pt-24 pb-32 md:p-10 lg:p-12 lg:pb-12 overflow-y-auto">
         <AnimatePresence mode="wait">
           {activeTab === "overview" && <OverviewTab key="overview" profile={profile} userName={userName} calPct={calPct} proteinPct={proteinPct} calCurrent={calCurrent} calTarget={calTarget} proteinCurrent={proteinCurrent} proteinTarget={proteinTarget} mealCount={mealCount} yesterdayData={weeklyData} todayMeals={todayMeals} yesterdayMeals={yesterdayMeals} historyMeals={historyMeals} suggestions={suggestions} coachInsights={coachInsights} goalLabel={goalLabel} activeProtocols={activeProtocols} protocolSummary={protocolSummary} onAddMeal={(item?: any) => { setPendingItem(item || null); setShowAddMeal(true); }} onToggleCoach={() => loadData()} setActiveTab={setActiveTab} onShowCoach={() => setShowCoachModal(true)} />}
 
@@ -389,6 +418,74 @@ export function DashboardClient() {
           </button>
         </div>
       </nav>
+
+      {/* ─── MOBILE DRAWER (Hamburger Menu) ─────────────────────── */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xl lg:hidden"
+            />
+            <motion.div 
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-xs z-[200] bg-[#080808] border-r border-white/5 p-6 flex flex-col lg:hidden"
+            >
+              <div className="flex justify-between items-center mb-12">
+                <Image 
+                  src="/images/smartplate-logo.jpg" 
+                  alt="SmartPlate Logo" 
+                  width={140} 
+                  height={44}
+                  className="w-32 h-auto object-contain"
+                />
+                <button 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 text-white/20 hover:text-white transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-2">
+                {sidebarItems.map((item) => (
+                  <button 
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setIsMobileMenuOpen(false);
+                    }} 
+                    className={`w-full flex items-center gap-4 px-4 py-4 text-[13px] tracking-wide rounded-2xl transition-all ${
+                      activeTab === item.id 
+                        ? 'bg-white text-black font-semibold shadow-[0_0_20px_rgba(255,255,255,0.1)]' 
+                        : 'text-white/40 hover:text-white/70 hover:bg-white/[0.03]'
+                    }`}
+                    style={{ fontFamily: 'var(--font-label)' }}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+
+              <button 
+                onClick={() => logout()} 
+                className="flex items-center gap-4 px-4 py-4 text-[13px] tracking-wide text-red-400/60 hover:text-red-400 hover:bg-red-400/5 transition-colors mt-auto rounded-2xl" 
+                style={{ fontFamily: 'var(--font-label)' }}
+              >
+                <LogOut size={20} />
+                Sign Out
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ─── MODALS ────────────────────────────────────────── */}
       <AnimatePresence>
@@ -1216,6 +1313,44 @@ function AddMealModal({
   const [aiInput, setAiInput] = useState("");
   const [isAiMode, setIsAiMode] = useState(true);
   const [isInterpreting, setIsInterpreting] = useState(false);
+  const [isVisionMode, setIsVisionMode] = useState(false);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzingImage(true);
+    setError("");
+    try {
+      const res = await analyzeImage(file);
+      if (res.data && res.data.length > 0) {
+        const newItems = res.data.map((f: any) => ({
+          foodName: f.label,
+          servingSize: f.servingSize || 100,
+          servingUnit: f.servingUnit || "g",
+          calories: f.calories,
+          proteinG: f.protein,
+          carbsG: f.carbs,
+          fatG: f.fat,
+          fiberG: f.fiber || 0,
+          userQuantity: f.servingSize || 100,
+          userUnit: f.servingUnit || "g",
+          category: "snack" as const
+        }));
+
+        setItems(prev => [...prev, ...newItems]);
+        setIsVisionMode(false);
+        setIsAiMode(false);
+      }
+    } catch (err: any) {
+      setError(err.message || "Vision engine encountered a bottleneck. Try a clearer image.");
+    } finally {
+      setIsAnalyzingImage(false);
+    }
+  };
+
 
   const handleAiInterpret = async () => {
     if (!aiInput.trim()) return;
@@ -1417,18 +1552,60 @@ function AddMealModal({
           <div className="space-y-6">
             <div className="flex justify-between items-center px-1">
               <label className="text-[13px] text-white/80 tracking-[0.4em] font-black uppercase">
-                {isAiMode ? "Smart Intelligence Mode" : "Standard Manual Override"}
+                {isVisionMode ? "Visual Intelligence active" : isAiMode ? "Smart Intelligence Mode" : "Standard Manual Override"}
               </label>
-              <button 
-                onClick={() => setIsAiMode(!isAiMode)}
-                className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${isAiMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/5 text-white/20'}`}
-              >
-                <Sparkles size={12} />
-                {isAiMode ? "AI Active" : "Manual Entry"}
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setIsVisionMode(true); setIsAiMode(false); }}
+                  className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${isVisionMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/5 text-white/20'}`}
+                >
+                  <Camera size={12} />
+                  Scan
+                </button>
+                <button 
+                  onClick={() => { setIsAiMode(!isAiMode); setIsVisionMode(false); }}
+                  className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${isAiMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/5 text-white/20'}`}
+                >
+                  <Sparkles size={12} />
+                  {isAiMode ? "AI Active" : "Manual Entry"}
+                </button>
+              </div>
             </div>
 
-            {isAiMode ? (
+
+            {isVisionMode ? (
+              <div className="space-y-6">
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-44 bg-white/[0.02] border-2 border-dashed border-white/10 hover:border-emerald-500/30 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 cursor-pointer transition-all group"
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleImageSelect} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
+                  {isAnalyzingImage ? (
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 animate-spin rounded-full" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400/60">Scanning Neural Patterns...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="p-5 bg-white/5 rounded-full group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-all">
+                        <Camera size={32} strokeWidth={1.5} />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-black italic tracking-tighter text-white">Upload Meal Image</p>
+                        <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest mt-1">Cloudinary Sync Active</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : isAiMode ? (
+
               <div className="space-y-6">
                 <div className="relative group">
                   <textarea 

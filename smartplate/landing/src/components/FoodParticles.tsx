@@ -59,15 +59,8 @@ function ParticleComponent({ p, springX, springY }: { p: ParticleData; springX: 
     const x = useTransform(springX, (val: number) => val * p.depth);
     const y = useTransform(springY, (val: number) => val * p.depth);
     
-    // Add a floating animation
-    const floatY = useSpring(0, { stiffness: 20, damping: 10 });
-    
-    useEffect(() => {
-        const interval = setInterval(() => {
-            floatY.set(Math.sin(Date.now() / 2000) * 20);
-        }, 50);
-        return () => clearInterval(interval);
-    }, [floatY]);
+    // Floating animation handled by framer-motion animate prop for better performance
+
 
     return (
         <motion.div
@@ -87,18 +80,27 @@ function ParticleComponent({ p, springX, springY }: { p: ParticleData; springX: 
         >
             <motion.div 
                 className="relative w-full h-full"
-                style={{ y: floatY }}
+                animate={{ 
+                    y: [0, -20, 0],
+                    rotate: [p.rotation, p.rotation + 5, p.rotation] 
+                }}
+                transition={{ 
+                    duration: 4 + Math.random() * 2, 
+                    repeat: Infinity, 
+                    ease: "easeInOut" 
+                }}
             >
-                {/* Ambient Aura */}
+                {/* Ambient Aura (Optimized: Lower blur) */}
                 <div 
-                    className="absolute inset-0 blur-[100px] opacity-15"
+                    className="absolute inset-0 blur-[60px] opacity-10"
                     style={{ backgroundColor: `rgb(${p.asset.color})` }}
                 />
-                {/* Food Image */}
+                {/* Food Image (Optimized: Lower blur) */}
                 <img 
                     src={p.asset.src} 
                     alt="food" 
-                    className="w-full h-full object-contain filter grayscale-[0.3] brightness-90 contrast-110 blur-[2px] transition-all duration-1000 hover:blur-0"
+                    className="w-full h-full object-contain filter grayscale-[0.3] brightness-90 contrast-110 blur-[1px] transition-all duration-1000 hover:blur-0"
+
                     style={{ 
                         maskImage: 'radial-gradient(circle, black, transparent 70%)',
                         transform: `rotate(${p.rotation}deg)`

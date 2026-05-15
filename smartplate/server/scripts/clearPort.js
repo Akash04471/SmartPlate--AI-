@@ -25,14 +25,19 @@ try {
     if (pids.size > 0) {
       console.log(`[PortGuard] Found ${pids.size} process(es) on port ${port}. Terminating...`);
       pids.forEach(pid => {
+        if (pid === process.pid.toString() || pid === process.ppid.toString()) {
+           console.log(`[PortGuard] Skipping self/parent PID ${pid}`);
+           return;
+        }
         try {
-          execSync(`taskkill /F /PID ${pid}`);
+          execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
           console.log(`[PortGuard] PID ${pid} terminated.`);
         } catch (e) {
-          // ignore failures to kill individual PIDs
+          console.warn(`[PortGuard] Could not terminate PID ${pid}: ${e.message}`);
         }
       });
     } else {
+
       console.log(`[PortGuard] Port ${port} is clear.`);
     }
   } else {

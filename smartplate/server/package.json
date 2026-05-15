@@ -2,7 +2,8 @@
   "type": "module",
   "scripts": {
     "predev": "node scripts/clearPort.js 5051",
-    "dev": "node --watch src/server.js",
+    "dev": "node --watch-path=src src/server.js",
+
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watchAll",
     "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --ci",
     "db:push": "drizzle-kit push",

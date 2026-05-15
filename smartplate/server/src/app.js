@@ -23,6 +23,13 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+// ── Request Logging ─────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
 // Strict limiter for auth endpoints — brute force protection
@@ -45,33 +52,29 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please slow down' },
 });
 
+// AI specific limiter — protects expensive API calls
+// 10 requests per minute per IP
+const aiLimiter = rateLimit({
+  windowMs:        60 * 1000,
+  max:             10,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: { error: 'AI processing quota reached for this minute. Please wait 60 seconds.' },
+});
+
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/debug-db', async (req, res) => {
-  try {
-    const tableRes = await pool.query(`
-      SELECT table_schema, table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-    `);
-    res.json({
-      success: true,
-      tables: tableRes.rows,
-      message: tableRes.rows.length === 0 ? "No tables found in 'public' schema" : `Found ${tableRes.rows.length} tables`
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message, stack: err.stack });
-  }
-});
 app.get('/',       (req, res) => res.send('API is running'));
 
 app.use('/api/auth',      authLimiter, authRoutes);
 app.use('/api/meal-logs', apiLimiter,  mealRoutes);
 app.use('/api/profile',   apiLimiter,  profileRoutes);
 app.use('/api/protocols', apiLimiter,  protocolRoutes);
-app.use('/api/nutrition', apiLimiter,  nutritionRoutes);
+app.use('/api/nutrition', aiLimiter,  nutritionRoutes);
 app.use('/api/progress',  apiLimiter,  progressRoutes);
-app.use('/api/coach',     apiLimiter,  coachRoutes);
+app.use('/api/coach',     aiLimiter,  coachRoutes);
+
 app.use('/api/tribes',    apiLimiter,  tribeRoutes);
 
 

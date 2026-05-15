@@ -62,9 +62,10 @@ export default function CustomCursor() {
                 />
             </motion.div>
             
-            {/* TRAILING SAP AURA */}
+            {/* TRAILING SAP AURA (Optimized: Lower blur) */}
             <motion.div
-                className="fixed top-0 left-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none z-[9998]"
+                className="fixed top-0 left-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-[60px] pointer-events-none z-[9998]"
+
                 style={{
                     x: cursorX,
                     y: cursorY,

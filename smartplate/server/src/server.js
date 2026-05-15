@@ -1,13 +1,38 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import http from "http";
 import { execSync } from "child_process";
 import app from "./app.js";
+
 
 const PORT = process.env.PORT || 5051;
 
 const server = http.createServer(app);
 
-server.keepAliveTimeout = 65000;
-server.headersTimeout = 66000;
+// ── Port Guardianship ────────────────────────────────────────────────────────
+const startServer = () => {
+  try {
+    if (process.platform === "win32") {
+      try {
+        execSync(`node scripts/clearPort.js ${PORT}`, { stdio: 'inherit' });
+      } catch (e) {
+        // Ignore if clearPort fails (e.g. no process found)
+      }
+    }
+    
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log("--------------------------------------------------");
+      console.log(`🚀 SmartPlate API: http://127.0.0.1:${PORT}`);
+      console.log(`📊 Mode: ${process.env.NODE_ENV || 'development'}`);
+      console.log("--------------------------------------------------");
+    });
+  } catch (err) {
+    console.error("[FATAL] Server binding failed:", err);
+    process.exit(1);
+  }
+};
+
 
 // ── Error Handling ───────────────────────────────────────────────────────────
 server.on("error", (error) => {
@@ -47,9 +72,5 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 // ── Initialization ───────────────────────────────────────────────────────────
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("--------------------------------------------------");
-  console.log(`🚀 SmartPlate API: http://127.0.0.1:${PORT}`);
-  console.log(`📊 Mode: ${process.env.NODE_ENV || 'development'}`);
-  console.log("--------------------------------------------------");
-});
+startServer();
+
